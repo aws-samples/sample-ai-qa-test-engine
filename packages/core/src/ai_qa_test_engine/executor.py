@@ -22,6 +22,7 @@ from ai_qa_test_engine.models import (
     StepResult,
     TestScenario,
 )
+from ai_qa_test_engine.trajectory import TrajectoryCache
 
 
 def substitute_variables(text: str, variables: dict) -> str:
@@ -167,14 +168,26 @@ def execute_scenario(
                     errors.append(f"Step {step_idx} ({keyword} {text}): {error_msg}")
 
                     if config.stop_on_failure:
-                        log(f"\n{'!' * 60}", "error")
-                        log(f"STOPPED ON FAILURE (--stop-on-failure)", "error")
-                        log(f"Failed at step {step_idx}: {keyword} {text}", "error")
-                        log(f"Error: {error_msg}", "error")
-                        log(f"To resume: ai-qa-test run --from-step {step_idx} ...", "error")
-                        log(f"{'!' * 60}", "error")
-                        # Keep browser open — don't break, just stop executing more steps
-                        input("\nPress Enter to close browser and exit...")
+                        # Re-translate and retry loop
+                        retried = _handle_stop_on_failure(
+                            step_idx=step_idx,
+                            scenario_name=scenario_name,
+                            keyword=keyword,
+                            text=text,
+                            error_msg=error_msg,
+                            nova=nova,
+                            extracted_values=extracted_values,
+                            functions=functions,
+                            config=config,
+                            feature_name=feature_name,
+                            steps=steps,
+                            step_results=step_results,
+                            errors=errors,
+                            log=log,
+                        )
+                        if retried:
+                            # Successfully retried — don't break, errors were cleared
+                            continue
 
                     # Stop on first failure
                     break
@@ -274,8 +287,13 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
     elif step.instruction:
         instruction = substitute_variables(step.instruction, extracted_values)
         log(f"  → Action: {instruction}")
-        nova.act(instruction)
-        return None
+        result = nova.act(instruction)
+
+        # Record trajectory if available (for future replay)
+        if hasattr(result, 'trajectory_file_path') and result.trajectory_file_path:
+            log(f"  → Trajectory recorded (replayable={result.replayable})")
+
+        return result
 
     elif step.extraction:
         extraction = step.extraction
@@ -321,3 +339,164 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
         return actual
 
     return None
+
+
+def _handle_stop_on_failure(
+    step_idx: int,
+    scenario_name: str,
+    keyword: str,
+    text: str,
+    error_msg: str,
+    nova,
+    extracted_values: dict,
+    functions: FunctionRegistry,
+    config: AppConfig,
+    feature_name: str,
+    steps: list,
+    step_results: list,
+    errors: list,
+    log,
+) -> bool:
+    """Handle stop-on-failure: wait for user to fix .feature, re-translate, detect changes, resume.
+
+    Flow:
+    1. Pause with browser open
+    2. User edits .feature file
+    3. User presses Enter
+    4. Re-translate the feature
+    5. Compare old vs new steps — find first changed step
+    6. Resume execution from that step (assumes browser state is compatible)
+
+    Returns True if retry succeeded and execution should continue, False to break.
+    """
+    from ai_qa_test_engine.translator import translate_all_features
+    from ai_qa_test_engine.models import Feature
+
+    log(f"\n{'!' * 60}", "error")
+    log(f"STOPPED ON FAILURE", "error")
+    log(f"Failed at step {step_idx}: {keyword} {text}", "error")
+    log(f"Error: {error_msg}", "error")
+    log(f"", "error")
+    log(f"Browser is open — inspect the page state.", "error")
+    log(f"Edit your .feature file to fix the issue, then press Enter.", "error")
+    log(f"System will re-translate and resume from the first changed step.", "error")
+    log(f"(Ctrl+C to abort)", "error")
+    log(f"{'!' * 60}", "error")
+
+    try:
+        input("\n>>> Press Enter after editing .feature file... ")
+    except (EOFError, KeyboardInterrupt):
+        log("\nAborted.", "error")
+        return False
+
+    # Re-translate
+    log(f"\n🔄 Re-translating feature file...")
+    feature_dir = config.resolve_feature_dir()
+    cache_dir = config.resolve_cache_dir()
+    tag_url_map = config.get_tag_url_mapping()
+
+    try:
+        translated = translate_all_features(
+            input_dir=feature_dir if feature_dir.is_dir() else feature_dir.parent,
+            output_dir=cache_dir,
+            tag_url_map=tag_url_map,
+            bedrock_model_id=config.bedrock_model_id,
+            common_steps_dir=config.common_steps_dir,
+        )
+
+        if not translated:
+            log("Re-translation produced no output", "error")
+            return False
+
+        # Find the correct feature by matching source_file or name
+        feature_data = None
+        for t in translated:
+            if t.get("source_file", "").replace(".feature", "") in feature_name or \
+               t.get("name", "") == scenario_name.split("::")[0]:
+                feature_data = t
+                break
+        if feature_data is None:
+            # Fallback: if only one feature was translated for a single file, use it
+            feature_data = translated[-1]  # Last translated is likely the target file
+
+        feature = Feature.model_validate(feature_data)
+
+        # Find matching scenario
+        updated_scenario = None
+        for sc in feature.scenarios:
+            if sc.name == scenario_name:
+                updated_scenario = sc
+                break
+        if updated_scenario is None and len(feature.scenarios) == 1:
+            updated_scenario = feature.scenarios[0]
+        if updated_scenario is None:
+            log("Could not find updated scenario after re-translation", "error")
+            return False
+
+        # Detect first changed step by comparing original_text
+        first_changed = step_idx  # Default: resume from the failed step
+        for i in range(len(updated_scenario.steps)):
+            if i >= len(steps):
+                first_changed = i + 1
+                break
+            old_text = steps[i].original_text
+            new_text = updated_scenario.steps[i].original_text
+            if old_text != new_text:
+                first_changed = i + 1  # 1-indexed
+                log(f"  Change detected at step {first_changed}: '{old_text}' → '{new_text}'")
+                break
+        else:
+            # No change detected in existing steps — default to failed step
+            first_changed = step_idx
+            log(f"  No text changes detected, resuming from failed step {step_idx}")
+
+        log(f"  Resuming execution from step {first_changed}...")
+
+        # Remove the failed step result and error
+        step_results.pop()
+        errors.pop()
+
+        # Execute from first_changed step onwards
+        for retry_idx in range(first_changed - 1, len(updated_scenario.steps)):
+            retry_step = updated_scenario.steps[retry_idx]
+            step_num = retry_idx + 1
+            log(f"Step {step_num}: {retry_step.original_keyword} {retry_step.original_text}")
+            step_start = time.time()
+
+            try:
+                result = _execute_step(retry_step, nova, extracted_values, functions, log)
+                step_duration = time.time() - step_start
+                step_results.append(StepResult(
+                    step_number=step_num,
+                    keyword=retry_step.original_keyword,
+                    original_text=retry_step.original_text,
+                    status="PASSED",
+                    duration_seconds=step_duration,
+                    extracted_value=result,
+                ))
+                log(f"  ✓ Step {step_num} passed ({step_duration:.1f}s)")
+            except (AssertionError, Exception) as e:
+                step_duration = time.time() - step_start
+                err_msg = str(e)
+                log(f"  ✗ Step {step_num} failed on retry: {err_msg}", "error")
+                step_results.append(StepResult(
+                    step_number=step_num,
+                    keyword=retry_step.original_keyword,
+                    original_text=retry_step.original_text,
+                    status="FAILED",
+                    duration_seconds=step_duration,
+                    error=err_msg,
+                ))
+                errors.append(f"Step {step_num}: {err_msg}")
+                return False
+
+        # Update steps list with new versions for any remaining logic
+        for i in range(len(updated_scenario.steps)):
+            if i < len(steps):
+                steps[i] = updated_scenario.steps[i]
+
+        return True
+
+    except Exception as e:
+        log(f"Retry failed: {e}", "error")
+        return False
