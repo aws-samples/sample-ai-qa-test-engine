@@ -1,4 +1,5 @@
 {
   "@NextDotGym": "https://nova.amazon.com/act/gym/next-dot/",
+  "@AmazonLogin": "https://www.amazon.com/ap/signin",
   "default": "https://nova.amazon.com/act/gym/next-dot/"
 }

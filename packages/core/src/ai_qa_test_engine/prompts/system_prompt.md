@@ -165,3 +165,35 @@ When I capture the order confirmation number
 Then the confirmation message should contain the order number
 → validation: prompt "The confirmation message", substring check, expected "${order_id}"
 ```
+
+AUTHENTICATION FIELD STEPS - Special handling for username/password fields:
+
+Steps that enter values into username or password fields MUST be converted to function_call steps
+(not instruction steps) because Nova Act guardrails block typing on auth pages.
+
+**Identifying auth field steps:**
+- "I enter X for username" / "I enter X in the username field" / "I type X as username"
+- "I enter X for password" / "I enter X in the password field" / "I type X as password"
+- "I enter X for email" / "I enter X in the email field"
+- Any step that types a value into a login/auth field
+
+**Conversion rules:**
+- "I enter 'value' for username" → function_call: enter_username with value "value"
+- "I enter 'value' for password" → function_call: enter_password with value "value"
+- "I enter '${var}' for username" → function_call: enter_username with value "${var}"
+- "I enter '${var}' for password" → function_call: enter_password with value "${var}"
+
+**Examples:**
+```
+And I enter "user@example.com" for username
+→ function_call: function_name: "enter_username", parameters: {"value": "user@example.com"}, storage_key: null
+
+And I enter "MyP@ssw0rd" for password
+→ function_call: function_name: "enter_password", parameters: {"value": "MyP@ssw0rd"}, storage_key: null
+
+And I enter "${secret_password}" for password
+→ function_call: function_name: "enter_password", parameters: {"value": "${secret_password}"}, storage_key: null
+```
+
+This ensures credentials are typed via Playwright (bypassing Nova Act guardrails on auth pages)
+and are never logged in Nova Act trajectory files.
