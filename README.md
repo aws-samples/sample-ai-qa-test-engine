@@ -18,13 +18,38 @@ ai-qa-test translate --feature-dir ./features/
 
 ## Features
 
-- **Gherkin → Nova Act**: AI translates BDD test steps into browser automation prompts
-- **Variable System**: Extract values from pages, use `${variable_name}` in later steps
-- **Custom Functions**: Call Python functions from Gherkin steps
-- **Translation Caching**: Cache translations locally (git-committable) to avoid repeated AI calls
-- **Rich Reports**: HTML dashboard with step details, screenshots, timing
-- **Browser Modes**: Headed (debug), headless (CI), AgentCore (scaled)
-- **AgentCore Deployment**: Parallel test execution at scale (Feature 5)
+| Feature | Description | Example |
+|---------|-------------|---------|
+| **Gherkin Execution** | Parse and execute .feature files with Nova Act | `Given I am on the home page` → browser navigates |
+| **Background Steps** | Shared steps prepended to every scenario | `Background:` block runs before each scenario |
+| **Scenario Outline** | Data-driven tests with Examples table | `Scenario Outline:` + `Examples:` expands to N scenarios |
+| **Data Tables** | Tabular data in steps | `\| field \| value \|` passed as step parameters |
+| **Variable Extraction** | Extract values from page, use in later steps | `store it as "order_id"` → `${order_id}` in next steps |
+| **Variable Substitution** | Reference extracted values with `${name}` | `Then I should see "${order_id}"` |
+| **Custom Functions** | Call Python functions from Gherkin steps | `I call 'calculate_tax' with amount 100 and store as 'tax'` |
+| **Reserved Params** | Functions can access browser and context | `nova_act` param = browser, `context` param = variables |
+| **Translation Caching** | Cache Gherkin→JSON translation (content-hash) | Second run skips translation, uses cached JSON |
+| **Tag-to-URL Mapping** | Map `@tags` to starting URLs | `@MyApp` → `https://myapp.com` via env or JSON file |
+| **Excel Data** | Load test data from .xlsx files | `I call 'load_excel_field' with file "data.xlsx" and sheet "Login"` |
+| **Secrets (env)** | Fetch secrets from .env for local dev | `I call 'get_secret' with secret_name "PASSWORD" and store as 'pw'` |
+| **Secrets (AWS SM)** | Fetch secrets from AWS Secrets Manager | Same as above — tries AWS SM first, falls back to .env |
+| **Secure Typing** | Type credentials via Playwright (not Nova Act) | `And I enter "user@example.com" for username` |
+| **Screenshot+Claude** | Extract data from screenshots using Claude | `I call 'extract_from_screenshot' with prompt "What is the order ID?"` |
+| **@include Steps** | Reuse common step sequences from .steps files | `And @include "login_flow"` expands steps inline |
+| **Stop on Failure** | Pause on failure, edit .feature, retry | `--stop-on-failure` keeps browser open, re-translates on Enter |
+| **Browser Modes** | Headed, headless, or AgentCore (remote) | `--browser-mode headed` / `headless` |
+| **HTML Reports** | Rich dashboard with step details + screenshots | Auto-generated at `reports/report.html` |
+| **CLI** | Command-line interface for all operations | `ai-qa-test run --feature-dir ./features/` |
+| **Force Re-translate** | Bypass cache and re-translate all features | `--force-translate` |
+
+### Planned (not yet implemented)
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Trajectory Replay** | Cache browser trajectories, replay instead of Nova Act | Feature 4 |
+| **AgentCore Deploy** | Parallel execution at scale with S3 I/O | Feature 5 |
+| **Gauge Support** | .md + .cpt test format | Feature 6 |
+| **Mobile Testing** | AWS Device Farm integration | Feature 7 |
 
 ## Project Structure
 
