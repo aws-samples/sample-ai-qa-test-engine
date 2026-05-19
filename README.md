@@ -26,6 +26,8 @@ ai-qa-test translate --feature-dir ./features/
 | **Data Tables** | Tabular data in steps | `\| field \| value \|` passed as step parameters |
 | **Variable Extraction** | Extract values from page, use in later steps | `store it as "order_id"` → `${order_id}` in next steps |
 | **Variable Substitution** | Reference extracted values with `${name}` | `Then I should see "${order_id}"` |
+| **Input Variables** | Pre-load variables from JSON file | `--variables-file vars.json` → `${name}` available in all steps |
+| **Output Variables** | Save extracted variables to JSON after scenario | Auto-saved to `extracted_variables/<scenario>.json` |
 | **Custom Functions** | Call Python functions from Gherkin steps | `I call 'calculate_tax' with amount 100 and store as 'tax'` |
 | **Reserved Params** | Functions can access browser and context | `nova_act` param = browser, `context` param = variables |
 | **Translation Caching** | Cache Gherkin→JSON translation (content-hash) | Second run skips translation, uses cached JSON |
@@ -40,7 +42,10 @@ ai-qa-test translate --feature-dir ./features/
 | **Browser Modes** | Headed, headless, or AgentCore (remote) | `--browser-mode headed` / `headless` |
 | **HTML Reports** | Rich dashboard with step details + screenshots | Auto-generated at `reports/report.html` |
 | **CLI** | Command-line interface for all operations | `ai-qa-test run --feature-dir ./features/` |
+| **Validate Command** | Check variables + functions without running browser | `ai-qa-test validate --feature-dir ./features/` |
+| **Video Recording** | Record browser session video | `--video` flag or `ENABLE_VIDEO_RECORDING=true` |
 | **Force Re-translate** | Bypass cache and re-translate all features | `--force-translate` |
+| **Screenshot on Fail** | Auto-captures screenshot when a step fails | Embedded in HTML report |
 
 ### Planned (not yet implemented)
 

@@ -183,7 +183,12 @@ class AppConfig(BaseSettings):
         description="Directory to store video recordings",
     )
 
-    # --- Common Steps (Future: Feature 3) ---
+    # --- Input Variables ---
+    input_variables_file: Path | None = Field(
+        default=None,
+        alias="INPUT_VARIABLES_FILE",
+        description="JSON file with pre-loaded variables available as ${name} in steps",
+    )
     common_steps_dir: Path | None = Field(
         default=None,
         alias="COMMON_STEPS_DIR",

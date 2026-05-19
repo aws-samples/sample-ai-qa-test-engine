@@ -100,6 +100,16 @@ def execute_scenario(
     step_results: list[StepResult] = []
     errors: list[str] = []
 
+    # Pre-load input variables from JSON file if specified
+    if config.input_variables_file:
+        import json as _json
+        vars_path = config._resolve_path(config.input_variables_file)
+        if vars_path.exists():
+            with open(vars_path) as f:
+                input_vars = _json.load(f)
+            extracted_values.update(input_vars)
+            log(f"Pre-loaded {len(input_vars)} variable(s) from {vars_path.name}")
+
     # Generate workflow name
     workflow_name = make_workflow_name(feature_name, scenario_name)
 
