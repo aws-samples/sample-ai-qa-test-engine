@@ -166,6 +166,16 @@ def execute_scenario(
                     ))
                     errors.append(f"Step {step_idx} ({keyword} {text}): {error_msg}")
 
+                    if config.stop_on_failure:
+                        log(f"\n{'!' * 60}", "error")
+                        log(f"STOPPED ON FAILURE (--stop-on-failure)", "error")
+                        log(f"Failed at step {step_idx}: {keyword} {text}", "error")
+                        log(f"Error: {error_msg}", "error")
+                        log(f"To resume: ai-qa-test run --from-step {step_idx} ...", "error")
+                        log(f"{'!' * 60}", "error")
+                        # Keep browser open — don't break, just stop executing more steps
+                        input("\nPress Enter to close browser and exit...")
+
                     # Stop on first failure
                     break
 

@@ -91,6 +91,7 @@ class TranslationService:
             output_dir=cache_dir,
             tag_url_map=tag_url_map,
             bedrock_model_id=self.config.bedrock_model_id,
+            common_steps_dir=self.config.common_steps_dir,
         )
 
         # Update cache hashes for translated files

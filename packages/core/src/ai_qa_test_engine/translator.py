@@ -12,7 +12,7 @@ from strands import Agent
 
 from ai_qa_test_engine.exceptions import TranslationError
 from ai_qa_test_engine.models import Feature
-from ai_qa_test_engine.parser import parse_gherkin_file
+from ai_qa_test_engine.parser import parse_gherkin_file, preprocess_feature_file
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -57,7 +57,8 @@ def resolve_model_id(agent: Agent) -> str:
 
 
 def translate_feature_to_json(
-    feature_path: Path, agent: Agent, tag_url_map: dict
+    feature_path: Path, agent: Agent, tag_url_map: dict,
+    common_steps_dir: Path | None = None,
 ) -> dict:
     """Translate a single .feature file to JSON structure.
 
@@ -65,6 +66,7 @@ def translate_feature_to_json(
         feature_path: Path to the .feature file
         agent: Strands agent for translation
         tag_url_map: Mapping of tags to URLs
+        common_steps_dir: Directory containing .steps files for @include resolution
 
     Returns:
         Translated feature dictionary
@@ -75,7 +77,13 @@ def translate_feature_to_json(
     print(f"  Translating {feature_path.name}...")
 
     try:
-        gherkin_ast = parse_gherkin_file(feature_path)
+        # Preprocess @includes, then parse
+        preprocessed_content = preprocess_feature_file(feature_path, common_steps_dir)
+
+        # Parse the preprocessed content (write to temp if includes were resolved)
+        from gherkin.parser import Parser as GherkinParser
+        parser = GherkinParser()
+        gherkin_ast = parser.parse(preprocessed_content)
 
         ast_json = json.dumps(gherkin_ast, indent=2)
         prompt = f"""Translate this Gherkin AST to JSON test structure.
@@ -127,6 +135,7 @@ def translate_all_features(
     output_dir: Path,
     tag_url_map: dict[str, str],
     bedrock_model_id: str | None = None,
+    common_steps_dir: Path | None = None,
 ) -> list[dict]:
     """Translate all Gherkin .feature files to JSON test structures.
 
@@ -135,6 +144,7 @@ def translate_all_features(
         output_dir: Directory to write translated JSON files.
         tag_url_map: Mapping of Gherkin tags to starting URLs.
         bedrock_model_id: Bedrock model ID for the Strands agent.
+        common_steps_dir: Directory containing .steps files for @include resolution.
 
     Returns:
         List of translated feature dictionaries.
@@ -176,7 +186,9 @@ def translate_all_features(
     translated_features = []
     for feature_file in feature_files:
         try:
-            feature_data = translate_feature_to_json(feature_file, agent, tag_url_map)
+            feature_data = translate_feature_to_json(
+                feature_file, agent, tag_url_map, common_steps_dir=common_steps_dir
+            )
             save_feature_json(feature_data, output_dir, feature_file.stem)
             translated_features.append(feature_data)
         except Exception as e:

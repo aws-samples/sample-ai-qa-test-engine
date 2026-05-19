@@ -31,6 +31,7 @@ def cli():
 @click.option("--functions-file", type=click.Path(exists=True, path_type=Path), help="Custom functions Python file")
 @click.option("--env-file", type=click.Path(exists=True, path_type=Path), default=None, help="Path to .env file")
 @click.option("--tag-url-map-file", type=click.Path(exists=True, path_type=Path), default=None, help="Path to tag-url-mapping.json")
+@click.option("--common-steps-dir", type=click.Path(exists=True, path_type=Path), default=None, help="Directory containing .steps files for @include")
 def run(
     feature_dir,
     output_dir,
@@ -42,6 +43,7 @@ def run(
     functions_file,
     env_file,
     tag_url_map_file,
+    common_steps_dir,
 ):
     """Execute tests from Gherkin feature files.
 
@@ -77,6 +79,8 @@ def run(
         config_kwargs["custom_functions_file"] = functions_file
     if tag_url_map_file:
         config_kwargs["tag_url_map_file"] = tag_url_map_file
+    if common_steps_dir:
+        config_kwargs["common_steps_dir"] = common_steps_dir
 
     # Handle --tag key=value pairs
     if tag:
