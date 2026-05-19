@@ -9,6 +9,9 @@ build/
 # uv
 uv.lock
 
+# AI-DLC documentation (development process, not shipped)
+aidlc-docs/
+
 # IDE
 .idea/
 .vscode/
