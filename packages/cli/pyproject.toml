@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-qa-test-engine-cli"
+version = "0.1.0"
+description = "AI-powered QA test execution engine - CLI"
+requires-python = ">=3.13"
+dependencies = [
+    "ai-qa-test-engine",
+    "click>=8.0",
+]
+
+[project.scripts]
+ai-qa-test = "ai_qa_test_engine_cli.main:cli"
+
+[tool.uv.sources]
+ai-qa-test-engine = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_qa_test_engine_cli"]

@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# uv
+uv.lock
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Reports (generated, not committed)
+reports/
+**/reports/
+
+# Recordings
+recordings/
+
+# Temp
+tmp/
+
+# Environment (secrets)
+.env
+
+# Cache hash files (internal metadata)
+.*.hash
+
+# Translated JSON cache (lives in user's test repo, not here)
+translated/
+**/translated/
+
+# Extracted variables (runtime output)
+extracted_variables/
+**/extracted_variables/
+
+# pytest
+.pytest_cache/

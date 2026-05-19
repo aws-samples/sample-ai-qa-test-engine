@@ -1,0 +1,11 @@
+[project]
+name = "ai-qa-test-engine-workspace"
+version = "0.1.0"
+description = "AI-powered QA test execution engine using Nova Act browser automation"
+requires-python = ">=3.13"
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+ai-qa-test-engine = { workspace = true }
