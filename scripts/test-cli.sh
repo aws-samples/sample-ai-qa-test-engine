@@ -390,6 +390,7 @@ check "feature-01 core pass" .venv/bin/ai-qa-test run \
     --feature-dir ./sample-tests/feature-01-core-execution/features/ \
     --tag-url-map-file ./sample-tests/feature-01-core-execution/tag-url-mapping.json \
     --functions-file ./sample-tests/feature-01-core-execution/custom_functions.py \
+    --functions-file ./sample-tests/feature-01-core-execution/functions_dir/ \
     --variables-file ./sample-tests/feature-01-core-execution/input_vars.json \
     --browser-mode headless
 echo ""
