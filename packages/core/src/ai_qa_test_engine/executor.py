@@ -308,6 +308,11 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
         if storage_key:
             extracted_values[storage_key] = result
             log(f"  → Stored as: {storage_key}")
+            # Auto-unpack dict results as storage_key.field_name
+            if isinstance(result, dict):
+                for k, v in result.items():
+                    extracted_values[f"{storage_key}.{k}"] = v
+                log(f"  → Unpacked {len(result)} field(s): {', '.join(f'${{{storage_key}.{k}}}' for k in result)}")
 
         log(f"  → Result: {result}")
         return result
