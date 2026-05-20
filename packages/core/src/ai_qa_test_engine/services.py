@@ -178,8 +178,21 @@ class TestExecutionService:
         # Load user functions
         user_funcs_path = self.config.resolve_custom_functions_file()
         if user_funcs_path and user_funcs_path.exists():
-            functions.load_from_file(user_funcs_path)
-            log(f"  Loaded user functions: {user_funcs_path.name}")
+            if user_funcs_path.is_dir():
+                count = functions.load_from_directory(user_funcs_path)
+                log(f"  Loaded {count} function file(s) from: {user_funcs_path.name}/")
+            else:
+                functions.load_from_file(user_funcs_path)
+                log(f"  Loaded user functions: {user_funcs_path.name}")
+
+        # Load additional function paths (from multiple --functions-file args)
+        for extra_path in getattr(self, 'extra_function_paths', []):
+            if extra_path.is_dir():
+                count = functions.load_from_directory(extra_path)
+                log(f"  Loaded {count} function file(s) from: {extra_path.name}/")
+            elif extra_path.exists():
+                functions.load_from_file(extra_path)
+                log(f"  Loaded user functions: {extra_path.name}")
 
         # Validate function references
         for feature_name, feature in features:

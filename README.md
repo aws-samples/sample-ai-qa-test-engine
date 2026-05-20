@@ -185,3 +185,28 @@ def take_screenshot_and_extract(prompt, nova_act, context):
     # ... process screenshot ...
     return extracted_value
 ```
+
+### Loading functions
+
+Functions can be specified via CLI in three ways:
+
+```bash
+# Single file
+ai-qa-test run --functions-file ./custom_functions.py
+
+# Directory (loads all .py files, enables cross-file imports)
+ai-qa-test run --functions-file ./my_functions/
+
+# Multiple sources
+ai-qa-test run --functions-file ./helpers.py --functions-file ./main_functions.py
+```
+
+**Directory mode** adds the directory to `sys.path`, so files can import each other:
+
+```
+my_functions/
+├── helpers.py          # def multiply(a, b): return a * b
+└── main_functions.py   # from helpers import multiply
+```
+
+You can also set `CUSTOM_FUNCTIONS_FILE=./my_functions/` in `.env`.

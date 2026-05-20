@@ -31,7 +31,7 @@ def cli():
 @click.option("--no-cache", is_flag=True, default=False, help="Disable trajectory replay cache (always use Nova Act)")
 @click.option("--trajectory-strict", is_flag=True, default=False, help="Strict trajectory validation (fail on mismatch)")
 @click.option("--tag", multiple=True, help="Tag-to-URL mapping (key=url)")
-@click.option("--functions-file", type=click.Path(exists=True, path_type=Path), help="Custom functions Python file")
+@click.option("--functions-file", multiple=True, type=click.Path(exists=True, path_type=Path), help="Custom functions file or directory (can specify multiple)")
 @click.option("--env-file", type=click.Path(exists=True, path_type=Path), default=None, help="Path to .env file")
 @click.option("--tag-url-map-file", type=click.Path(exists=True, path_type=Path), default=None, help="Path to tag-url-mapping.json")
 @click.option("--common-steps-dir", type=click.Path(exists=True, path_type=Path), default=None, help="Directory containing .steps files for @include")
@@ -90,7 +90,8 @@ def run(
     if trajectory_strict:
         config_kwargs["trajectory_strict"] = True
     if functions_file:
-        config_kwargs["custom_functions_file"] = functions_file
+        # First path goes into config (used by service for primary loading)
+        config_kwargs["custom_functions_file"] = functions_file[0]
     if tag_url_map_file:
         config_kwargs["tag_url_map_file"] = tag_url_map_file
     if common_steps_dir:
@@ -116,6 +117,10 @@ def run(
 
     # Run
     service = TestExecutionService(config)
+
+    # Load additional function files/dirs beyond the first
+    if len(functions_file) > 1:
+        service.extra_function_paths = list(functions_file[1:])
 
     def log_callback(msg: str, level: str = "info"):
         if level == "error":

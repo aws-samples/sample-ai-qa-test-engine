@@ -46,6 +46,9 @@ class FunctionRegistry:
     def load_from_file(self, file_path: Path) -> None:
         """Load functions from a Python file.
 
+        The file's parent directory is added to sys.path so that
+        sibling files can import each other.
+
         Args:
             file_path: Path to .py file containing functions
 
@@ -53,8 +56,15 @@ class FunctionRegistry:
             FileNotFoundError: If file doesn't exist
             RuntimeError: If file can't be loaded
         """
+        import sys
+
         if not file_path.exists():
             raise FileNotFoundError(f"Functions file not found: {file_path}")
+
+        # Add parent dir to sys.path so files can import siblings
+        parent_dir = str(file_path.parent.resolve())
+        if parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
 
         spec = importlib.util.spec_from_file_location(
             f"custom_functions_{file_path.stem}", file_path
@@ -69,6 +79,39 @@ class FunctionRegistry:
             raise RuntimeError(f"Error loading functions file {file_path}: {e}") from e
 
         self._modules.append(module)
+
+    def load_from_directory(self, dir_path: Path) -> int:
+        """Load all .py files from a directory as function modules.
+
+        The directory is added to sys.path so files can import each other.
+        Files starting with _ are skipped.
+
+        Args:
+            dir_path: Directory containing .py function files
+
+        Returns:
+            Number of files loaded
+
+        Raises:
+            FileNotFoundError: If directory doesn't exist
+        """
+        import sys
+
+        if not dir_path.exists():
+            raise FileNotFoundError(f"Functions directory not found: {dir_path}")
+
+        # Add dir to sys.path so files can import each other
+        resolved = str(dir_path.resolve())
+        if resolved not in sys.path:
+            sys.path.insert(0, resolved)
+
+        count = 0
+        for py_file in sorted(dir_path.glob("*.py")):
+            if py_file.name.startswith("_"):
+                continue
+            self.load_from_file(py_file)
+            count += 1
+        return count
 
     def load_bundled(self, functions_dir: Path) -> None:
         """Load all .py files from a bundled functions directory.
