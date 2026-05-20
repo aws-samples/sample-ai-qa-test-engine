@@ -306,13 +306,25 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
         )
 
         if storage_key:
-            extracted_values[storage_key] = result
-            log(f"  → Stored as: {storage_key}")
-            # Auto-unpack dict results as storage_key.field_name
-            if isinstance(result, dict):
-                for k, v in result.items():
-                    extracted_values[f"{storage_key}.{k}"] = v
-                log(f"  → Unpacked {len(result)} field(s): {', '.join(f'${{{storage_key}.{k}}}' for k in result)}")
+            # Support multiple storage keys: "username, password" unpacks tuple/list
+            if "," in storage_key:
+                keys = [k.strip() for k in storage_key.split(",")]
+                if isinstance(result, (tuple, list)) and len(result) == len(keys):
+                    for k, v in zip(keys, result):
+                        extracted_values[k] = v
+                    log(f"  → Stored as: {', '.join(keys)}")
+                else:
+                    # Mismatch — store full result under first key, warn
+                    extracted_values[keys[0]] = result
+                    log(f"  → Warning: expected {len(keys)} values but got {type(result).__name__}, stored under {keys[0]}")
+            else:
+                extracted_values[storage_key] = result
+                log(f"  → Stored as: {storage_key}")
+                # Auto-unpack dict results as storage_key.field_name
+                if isinstance(result, dict):
+                    for k, v in result.items():
+                        extracted_values[f"{storage_key}.{k}"] = v
+                    log(f"  → Unpacked {len(result)} field(s): {', '.join(f'${{{storage_key}.{k}}}' for k in result)}")
 
         log(f"  → Result: {result}")
         return result

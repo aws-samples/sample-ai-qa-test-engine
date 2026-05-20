@@ -29,6 +29,8 @@ ai-qa-test translate --feature-dir ./features/
 | **Input Variables** | Pre-load variables from JSON file | `--variables-file vars.json` → `${name}` available in all steps |
 | **Output Variables** | Save extracted variables to JSON after scenario | Auto-saved to `extracted_variables/<scenario>.json` |
 | **Custom Functions** | Call Python functions from Gherkin steps | `I call 'calculate_tax' with amount 100 and store as 'tax'` |
+| **Multi-value Return (dict)** | Functions returning dict auto-unpack to `${key.field}` | `store as 'row'` → `${row.name}`, `${row.price}` |
+| **Multi-value Return (tuple)** | Comma-separated storage keys unpack tuple/list | `store as 'username, password'` → `${username}`, `${password}` |
 | **Reserved Params** | Functions can access browser and context | `nova_act` param = browser, `context` param = variables |
 | **Translation Caching** | Cache Gherkin→JSON translation (content-hash) | Second run skips translation, uses cached JSON |
 | **Tag-to-URL Mapping** | Map `@tags` to starting URLs | `@MyApp` → `https://myapp.com` via env or JSON file |
@@ -125,4 +127,61 @@ uv sync
 
 # Run from source
 uv run ai-qa-test run --feature-dir ./sample-tests/feature-01-core-execution/features/
+```
+
+## Custom Functions
+
+Custom functions are Python functions loaded from a file via `--functions-file`. They can return single values, dicts (auto-unpacked), or tuples (positional unpack).
+
+### Single value return
+
+```python
+# custom_functions.py
+def calculate_tax(amount, rate=0.08):
+    return amount * rate
+```
+
+```gherkin
+When I call 'calculate_tax' with amount 100 and store as "tax"
+Then the tax should equal "${tax}"   # tax = 8.0
+```
+
+### Dict return (auto-unpacked to ${key.field})
+
+```python
+def get_user_profile(user_id):
+    return {"name": "Alice", "email": "alice@example.com", "role": "admin"}
+```
+
+```gherkin
+When I call 'get_user_profile' with user_id "123" and store as "user"
+Then I should see "${user.name}" on the page       # Alice
+And the email field should show "${user.email}"    # alice@example.com
+And the role should be "${user.role}"              # admin
+```
+
+### Tuple/list return (positional unpack with comma-separated keys)
+
+```python
+def get_credentials(env="staging"):
+    return ("testuser@example.com", "s3cret!")
+```
+
+```gherkin
+When I call 'get_credentials' with env "staging" and store as "username, password"
+And I enter "${username}" for username
+And I enter "${password}" for password
+```
+
+### Accessing browser and context
+
+Functions can declare `nova_act` and `context` parameters to access the browser session and extracted variables:
+
+```python
+def take_screenshot_and_extract(prompt, nova_act, context):
+    """Uses browser to screenshot, then extracts data."""
+    page = nova_act.get_page()
+    screenshot = page.screenshot()
+    # ... process screenshot ...
+    return extracted_value
 ```
