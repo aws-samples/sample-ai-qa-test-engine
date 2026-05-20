@@ -114,15 +114,10 @@ class TrajectoryCache:
     def is_step_no_cache(self, step_text: str) -> bool:
         """Check if a step should skip trajectory cache.
 
-        Steps skip cache if:
-        - They have @no-cache annotation
-        - They contain ${variable} references (dynamic content = unsafe to replay)
+        Steps skip cache only if they have @no-cache annotation.
+        Variable steps are handled by keying on the resolved instruction text.
         """
-        if "@no-cache" in step_text.lower():
-            return True
-        if "${" in step_text:
-            return True
-        return False
+        return "@no-cache" in step_text.lower()
 
     def clear(self) -> int:
         """Clear all cached trajectories.

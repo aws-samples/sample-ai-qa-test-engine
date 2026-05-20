@@ -319,9 +319,10 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
         step_text = step.original_text
 
         # Check trajectory cache for replay (skip if @no-cache)
+        # Key on resolved instruction so variable steps cache correctly when value is same
         if traj_cache and not traj_cache.is_step_no_cache(step_text):
             cached_path = traj_cache.get_trajectory_path(
-                feature_name, scenario_name, step_index, step_text
+                feature_name, scenario_name, step_index, instruction
             )
             if cached_path:
                 from ai_qa_test_engine.trajectory import replay_cached_trajectory
@@ -334,14 +335,14 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
         # No cache hit or replay failed — execute via Nova Act
         result = nova.act(instruction)
 
-        # Save trajectory to cache if available
+        # Save trajectory to cache keyed on resolved instruction
         if traj_cache and not traj_cache.is_step_no_cache(step_text):
             if hasattr(result, 'trajectory_file_path') and result.trajectory_file_path:
                 traj_cache.save_trajectory(
                     feature_name=feature_name,
                     scenario_name=scenario_name,
                     step_index=step_index,
-                    step_text=step_text,
+                    step_text=instruction,  # Key on resolved text
                     trajectory_file_path=result.trajectory_file_path,
                 )
                 log(f"  → Trajectory saved to cache")
