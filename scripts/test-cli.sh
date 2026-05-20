@@ -275,6 +275,46 @@ try:
 except AttributeError as e:
     print(f'AttributeError: {e}')
 "
+
+# Dict return — multi-value
+check_output "dict return auto-unpacks" "1.1g" .venv/bin/python -c "
+from ai_qa_test_engine.function_registry import FunctionRegistry
+from pathlib import Path
+reg = FunctionRegistry()
+reg.load_from_file(Path('sample-tests/feature-01-core-execution/custom_functions.py'))
+result = reg.call('get_destination_stats', {'destination': 'Proxima Centauri b'})
+assert isinstance(result, dict)
+assert result['gravity'] == '1.1g'
+assert result['distance'] == '4.24 ly'
+print(result['gravity'])
+"
+
+# Tuple return — multi-value
+check_output "tuple return for positional unpack" "testuser@example.com" .venv/bin/python -c "
+from ai_qa_test_engine.function_registry import FunctionRegistry
+from pathlib import Path
+reg = FunctionRegistry()
+reg.load_from_file(Path('sample-tests/feature-01-core-execution/custom_functions.py'))
+result = reg.call('get_credentials', {'env': 'test'})
+assert isinstance(result, tuple)
+assert result[0] == 'testuser@example.com'
+assert result[1] == 'test_pass_123'
+print(result[0])
+"
+
+# Directory loading + cross-file imports
+check_output "directory load + cross-file import" "2200.0" .venv/bin/python -c "
+from ai_qa_test_engine.function_registry import FunctionRegistry
+from pathlib import Path
+reg = FunctionRegistry()
+count = reg.load_from_directory(Path('sample-tests/feature-01-core-execution/functions_dir'))
+assert count == 2
+result = reg.call('calculate_trip_total', {'base_price': 1000, 'passengers': 2})
+assert result['subtotal'] == 2000.0
+assert result['tax'] == 200.0
+assert result['total'] == 2200.0
+print(result['total'])
+"
 echo ""
 
 # ============================================================
