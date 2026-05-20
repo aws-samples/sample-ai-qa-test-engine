@@ -70,6 +70,7 @@ def create_browser_session(
     nova_kwargs = {
         'starting_page': base_url,
         'headless': headless,
+        'replayable': True,  # Enable trajectory recording for replay cache
     }
 
     # Video recording

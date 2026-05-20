@@ -28,6 +28,8 @@ def cli():
 @click.option("--from-step", type=int, default=None, help="Resume from step N")
 @click.option("--force-translate", is_flag=True, default=False, help="Force re-translation (bypass cache)")
 @click.option("--video", is_flag=True, default=False, help="Enable video recording of browser session")
+@click.option("--no-cache", is_flag=True, default=False, help="Disable trajectory replay cache (always use Nova Act)")
+@click.option("--trajectory-strict", is_flag=True, default=False, help="Strict trajectory validation (fail on mismatch)")
 @click.option("--tag", multiple=True, help="Tag-to-URL mapping (key=url)")
 @click.option("--functions-file", type=click.Path(exists=True, path_type=Path), help="Custom functions Python file")
 @click.option("--env-file", type=click.Path(exists=True, path_type=Path), default=None, help="Path to .env file")
@@ -42,6 +44,8 @@ def run(
     from_step,
     force_translate,
     video,
+    no_cache,
+    trajectory_strict,
     tag,
     functions_file,
     env_file,
@@ -81,6 +85,10 @@ def run(
         config_kwargs["force_translate"] = True
     if video:
         config_kwargs["enable_video_recording"] = True
+    if no_cache:
+        config_kwargs["no_cache"] = True
+    if trajectory_strict:
+        config_kwargs["trajectory_strict"] = True
     if functions_file:
         config_kwargs["custom_functions_file"] = functions_file
     if tag_url_map_file:

@@ -39,6 +39,10 @@ tmp/
 translated/
 **/translated/
 
+# Trajectory cache (lives in user's test repo, not here)
+trajectories/
+**/trajectories/
+
 # Extracted variables (runtime output)
 extracted_variables/
 **/extracted_variables/

@@ -45,13 +45,15 @@ ai-qa-test translate --feature-dir ./features/
 | **Validate Command** | Check variables + functions without running browser | `ai-qa-test validate --feature-dir ./features/` |
 | **Video Recording** | Record browser session video | `--video` flag or `ENABLE_VIDEO_RECORDING=true` |
 | **Force Re-translate** | Bypass cache and re-translate all features | `--force-translate` |
+| **Trajectory Replay** | Cache browser trajectories, replay without AI model calls | Second run auto-replays; `--no-cache` to bypass |
+| **@no-cache Annotation** | Skip trajectory cache for specific steps | `When I click submit @no-cache` always uses Nova Act |
+| **Trajectory Strict** | Validate URL/screenshot/DOM during replay | `--trajectory-strict` fails on page state mismatch |
 | **Screenshot on Fail** | Auto-captures screenshot when a step fails | Embedded in HTML report |
 
 ### Planned (not yet implemented)
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **Trajectory Replay** | Cache browser trajectories, replay instead of Nova Act | Feature 4 |
 | **AgentCore Deploy** | Parallel execution at scale with S3 I/O | Feature 5 |
 | **Gauge Support** | .md + .cpt test format | Feature 6 |
 | **Mobile Testing** | AWS Device Farm integration | Feature 7 |
@@ -78,10 +80,14 @@ ai-qa-test run --feature-dir ./features/ [options]
 #   --stop-on-failure                 Stop and keep browser open on failure
 #   --from-step N                     Resume from step N
 #   --force-translate                 Bypass translation cache
+#   --no-cache                        Disable trajectory replay (always use Nova Act)
+#   --trajectory-strict               Strict trajectory validation (fail on mismatch)
+#   --video                           Enable video recording
 #   --tag key=url                     Tag-to-URL mapping
 #   --functions-file path.py          Custom functions file
 #   --tag-url-map-file map.json       Tag-URL mapping JSON file
 #   --env-file .env                   Environment file
+#   --variables-file vars.json        Pre-load variables from JSON
 
 # Translate only
 ai-qa-test translate --feature-dir ./features/ [options]

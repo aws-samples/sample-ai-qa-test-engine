@@ -436,6 +436,79 @@ fi
 rm -rf "$TEST_TMP"
 echo ""
 
+echo "🚀 Feature 04: Trajectory cache (record on first run, replay on second)"
+# First run — records trajectories
+TRAJ_TMP="/tmp/test-trajectory-$$"
+mkdir -p "$TRAJ_TMP/features" "$TRAJ_TMP/trajectories"
+cat > "$TRAJ_TMP/features/traj_test.feature" << 'EOF'
+@nextdotgym
+Feature: Trajectory test
+  Scenario: Navigate to destinations
+    Given I am on the Next Dot Gym homepage
+    When I click on the Destinations page
+    Then I should see a list of destinations
+EOF
+cp sample-tests/feature-01-core-execution/tag-url-mapping.json "$TRAJ_TMP/"
+cat > "$TRAJ_TMP/.env" << 'EOF'
+FEATURE_DIR=features
+BROWSER_MODE=headless
+TRAJECTORY_CACHE_DIR=trajectories
+EOF
+
+# Run 1: record
+.venv/bin/ai-qa-test run \
+    --feature-dir "$TRAJ_TMP/features/" \
+    --tag-url-map-file "$TRAJ_TMP/tag-url-mapping.json" \
+    --env-file "$TRAJ_TMP/.env" \
+    --browser-mode headless > "$TRAJ_TMP/run1.log" 2>&1
+RUN1_EXIT=$?
+
+# Check trajectory files were created
+TRAJ_COUNT=$(find "$TRAJ_TMP/trajectories" -name "*_trajectory.json" 2>/dev/null | wc -l | tr -d ' ')
+if [ "$RUN1_EXIT" -eq 0 ] && [ "$TRAJ_COUNT" -gt 0 ]; then
+    echo "  ✓ trajectory recording: $TRAJ_COUNT trajectory file(s) saved"
+    PASS=$((PASS + 1))
+else
+    echo "  ✗ trajectory recording: exit=$RUN1_EXIT, files=$TRAJ_COUNT"
+    FAIL=$((FAIL + 1))
+fi
+
+# Run 2: replay (should see "Replaying from cache" in logs)
+.venv/bin/ai-qa-test run \
+    --feature-dir "$TRAJ_TMP/features/" \
+    --tag-url-map-file "$TRAJ_TMP/tag-url-mapping.json" \
+    --env-file "$TRAJ_TMP/.env" \
+    --browser-mode headless > "$TRAJ_TMP/run2.log" 2>&1
+RUN2_EXIT=$?
+
+if [ "$RUN2_EXIT" -eq 0 ] && grep -q "Replaying from cache\|Replay successful" "$TRAJ_TMP/run2.log" 2>/dev/null; then
+    echo "  ✓ trajectory replay: cache hit on second run"
+    PASS=$((PASS + 1))
+else
+    echo "  ✗ trajectory replay: exit=$RUN2_EXIT (check $TRAJ_TMP/run2.log)"
+    FAIL=$((FAIL + 1))
+fi
+
+# Run 3: --no-cache should NOT replay
+.venv/bin/ai-qa-test run \
+    --feature-dir "$TRAJ_TMP/features/" \
+    --tag-url-map-file "$TRAJ_TMP/tag-url-mapping.json" \
+    --env-file "$TRAJ_TMP/.env" \
+    --browser-mode headless \
+    --no-cache > "$TRAJ_TMP/run3.log" 2>&1
+RUN3_EXIT=$?
+
+if [ "$RUN3_EXIT" -eq 0 ] && ! grep -q "Replaying from cache" "$TRAJ_TMP/run3.log" 2>/dev/null; then
+    echo "  ✓ --no-cache: bypasses trajectory cache"
+    PASS=$((PASS + 1))
+else
+    echo "  ✗ --no-cache: exit=$RUN3_EXIT or still replayed"
+    FAIL=$((FAIL + 1))
+fi
+
+rm -rf "$TRAJ_TMP"
+echo ""
+
 # Verify report was generated
 check_file_exists "HTML report generated" "reports/report.html"
 echo ""

@@ -183,6 +183,25 @@ class AppConfig(BaseSettings):
         description="Directory to store video recordings",
     )
 
+    # --- Trajectory Cache Settings ---
+    trajectory_cache_dir: Path = Field(
+        default=Path("trajectories"),
+        alias="TRAJECTORY_CACHE_DIR",
+        description="Directory for trajectory replay cache (git-committable)",
+    )
+
+    no_cache: bool = Field(
+        default=False,
+        alias="NO_CACHE",
+        description="Disable trajectory replay cache (always use Nova Act)",
+    )
+
+    trajectory_strict: bool = Field(
+        default=False,
+        alias="TRAJECTORY_STRICT",
+        description="Strict mode for trajectory replay validation (raise on mismatch)",
+    )
+
     # --- Input Variables ---
     input_variables_file: Path | None = Field(
         default=None,
@@ -258,3 +277,6 @@ class AppConfig(BaseSettings):
 
     def resolve_video_recording_dir(self) -> Path:
         return self._resolve_path(self.video_recording_dir)
+
+    def resolve_trajectory_cache_dir(self) -> Path:
+        return self._resolve_path(self.trajectory_cache_dir)

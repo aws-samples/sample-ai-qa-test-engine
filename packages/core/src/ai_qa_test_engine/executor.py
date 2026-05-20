@@ -110,6 +110,13 @@ def execute_scenario(
             extracted_values.update(input_vars)
             log(f"Pre-loaded {len(input_vars)} variable(s) from {vars_path.name}")
 
+    # Initialize trajectory cache (unless --no-cache)
+    traj_cache = None
+    if not config.no_cache:
+        cache_dir = config.resolve_trajectory_cache_dir()
+        traj_cache = TrajectoryCache(cache_dir)
+        log(f"Trajectory cache: {cache_dir}")
+
     # Generate workflow name
     workflow_name = make_workflow_name(feature_name, scenario_name)
 
@@ -135,7 +142,12 @@ def execute_scenario(
 
                 try:
                     result = _execute_step(
-                        step, nova, extracted_values, functions, log
+                        step, nova, extracted_values, functions, log,
+                        traj_cache=traj_cache,
+                        feature_name=feature_name,
+                        scenario_name=scenario_name,
+                        step_index=step_idx,
+                        trajectory_strict=config.trajectory_strict,
                     )
                     step_duration = time.time() - step_start
 
@@ -257,10 +269,16 @@ def execute_scenario(
     )
 
 
-def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistry, log) -> Any:
+def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistry, log,
+                  traj_cache: Optional['TrajectoryCache'] = None,
+                  feature_name: str = "",
+                  scenario_name: str = "",
+                  step_index: int = 0,
+                  trajectory_strict: bool = False) -> Any:
     """Execute a single step. Returns extracted/computed value if any.
 
     Core dispatch logic ported as-is from test_translator/utils/execution.py.
+    Extended with trajectory replay: checks cache before act(), saves after.
     """
     if step.function_call:
         func_name = step.function_call.function_name
@@ -297,11 +315,36 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
     elif step.instruction:
         instruction = substitute_variables(step.instruction, extracted_values)
         log(f"  → Action: {instruction}")
+
+        step_text = step.original_text
+
+        # Check trajectory cache for replay (skip if @no-cache)
+        if traj_cache and not traj_cache.is_step_no_cache(step_text):
+            cached_path = traj_cache.get_trajectory_path(
+                feature_name, scenario_name, step_index, step_text
+            )
+            if cached_path:
+                from ai_qa_test_engine.trajectory import replay_cached_trajectory
+                log(f"  → Replaying from cache: {cached_path.name}")
+                replayed = replay_cached_trajectory(nova, cached_path, strict=trajectory_strict)
+                if replayed:
+                    log(f"  → Replay successful (no AI model call)")
+                    return None  # Replay doesn't return ActResult
+
+        # No cache hit or replay failed — execute via Nova Act
         result = nova.act(instruction)
 
-        # Record trajectory if available (for future replay)
-        if hasattr(result, 'trajectory_file_path') and result.trajectory_file_path:
-            log(f"  → Trajectory recorded (replayable={result.replayable})")
+        # Save trajectory to cache if available
+        if traj_cache and not traj_cache.is_step_no_cache(step_text):
+            if hasattr(result, 'trajectory_file_path') and result.trajectory_file_path:
+                traj_cache.save_trajectory(
+                    feature_name=feature_name,
+                    scenario_name=scenario_name,
+                    step_index=step_index,
+                    step_text=step_text,
+                    trajectory_file_path=result.trajectory_file_path,
+                )
+                log(f"  → Trajectory saved to cache")
 
         return result
 
