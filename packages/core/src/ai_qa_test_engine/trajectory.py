@@ -112,11 +112,17 @@ class TrajectoryCache:
         return path if path.exists() else None
 
     def is_step_no_cache(self, step_text: str) -> bool:
-        """Check if a step has @no-cache annotation.
+        """Check if a step should skip trajectory cache.
 
-        Steps with @no-cache always use Nova Act, never replay.
+        Steps skip cache if:
+        - They have @no-cache annotation
+        - They contain ${variable} references (dynamic content = unsafe to replay)
         """
-        return "@no-cache" in step_text.lower()
+        if "@no-cache" in step_text.lower():
+            return True
+        if "${" in step_text:
+            return True
+        return False
 
     def clear(self) -> int:
         """Clear all cached trajectories.
