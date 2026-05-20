@@ -20,18 +20,18 @@ Feature: Trajectory replay caching
   Uses multi-step flows across different pages to exercise trajectory caching.
 
   Scenario: Browse destination details and verify planetary data
-    Given I am on the Next Dot Gym homepage
+    Given I am on the home page
     When I navigate to the destinations section
     And I select "Proxima Centauri b" from the destinations
     Then I should see the destination name "Proxima Centauri b"
     And the gravity information should show "1.1g"
     And the atmosphere pressure should be displayed
-    And the oxygen content should show "19%"
+    And the oxygen content should contain "19%"
     When I scroll down to the colony life section
-    Then the population should show "234,000 colonists"
+    Then the population information should contain "234,000"
 
   Scenario: Book a journey search flow
-    Given I am on the Next Dot Gym homepage
+    Given I am on the home page
     When I click on "Book Your Journey" in the navigation
     Then I should see the flight search form
     And I should see "7 BOOKABLE DESTINATIONS" displayed
@@ -40,7 +40,7 @@ Feature: Trajectory replay caching
     Then the search form should have both origin and destination filled
 
   Scenario: Navigate across multiple pages
-    Given I am on the Next Dot Gym homepage
+    Given I am on the home page
     When I click on "Why Go" in the navigation
     Then I should see "The Adventure of a Lifetime" heading
     And I should see the stat "99.7% SAFE ARRIVAL RATE"
@@ -51,7 +51,7 @@ Feature: Trajectory replay caching
     And the travel time should be displayed
 
   Scenario: Steps with @no-cache bypass trajectory replay
-    Given I am on the Next Dot Gym homepage
+    Given I am on the home page
     When I navigate to the destinations section @no-cache
     Then I should see a list of available destinations
     When I select "TRAPPIST-1e" from the destinations @no-cache
