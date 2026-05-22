@@ -1,0 +1,79 @@
+{
+  "Description": "Minimum IAM policy for the AgentCore execution role. Admin creates a role with this policy and passes the ARN via --role-arn.",
+  "TrustPolicy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "bedrock-agentcore.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+      }
+    ]
+  },
+  "PermissionsPolicy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "S3Access",
+        "Effect": "Allow",
+        "Action": [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket",
+          "s3:HeadObject"
+        ],
+        "Resource": [
+          "arn:aws:s3:::YOUR-BUCKET-NAME",
+          "arn:aws:s3:::YOUR-BUCKET-NAME/*"
+        ]
+      },
+      {
+        "Sid": "BedrockModelAccess",
+        "Effect": "Allow",
+        "Action": [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
+        ],
+        "Resource": "*"
+      },
+      {
+        "Sid": "AgentCoreInvoke",
+        "Effect": "Allow",
+        "Action": [
+          "bedrock-agentcore:InvokeAgentRuntime"
+        ],
+        "Resource": "arn:aws:bedrock-agentcore:*:*:runtime/*"
+      },
+      {
+        "Sid": "NovaAct",
+        "Effect": "Allow",
+        "Action": [
+          "nova-act:*"
+        ],
+        "Resource": "*"
+      },
+      {
+        "Sid": "AgentCoreBrowser",
+        "Effect": "Allow",
+        "Action": [
+          "bedrock-agentcore:CreateBrowserSession",
+          "bedrock-agentcore:GetBrowserSession",
+          "bedrock-agentcore:StopBrowserSession"
+        ],
+        "Resource": "*"
+      },
+      {
+        "Sid": "CloudWatchLogs",
+        "Effect": "Allow",
+        "Action": [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        "Resource": "*"
+      }
+    ]
+  }
+}

@@ -22,7 +22,7 @@ STACK_NAME="${STACK_NAME:-ai-qa-test-engine}"
 REGION="${AWS_REGION:-us-east-1}"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 ECR_REPO="${STACK_NAME}-test-runner"
-IMAGE_TAG="latest"
+IMAGE_TAG=$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo "latest")
 DEPLOY_BUCKET="${STACK_NAME}-deploy-${ACCOUNT_ID}-${REGION}"
 CREATE_ECR=false
 EXISTING_ROLE_ARN=""
@@ -97,6 +97,8 @@ echo ""
 echo "📦 Packaging Orchestrator..."
 cd "$PROJECT_ROOT/packages/agentcore-orchestrator"
 
+DEPLOY_TIMESTAMP=$(date +%Y%m%d%H%M%S)
+ORCHESTRATOR_S3_KEY="deploy/orchestrator-${DEPLOY_TIMESTAMP}.zip"
 ORCHESTRATOR_ZIP="/tmp/${STACK_NAME}-orchestrator.zip"
 zip -r "$ORCHESTRATOR_ZIP" main.py invoker.py s3_utils.py reporting.py pyproject.toml
 echo "  ✓ Created: $ORCHESTRATOR_ZIP"
@@ -105,14 +107,14 @@ echo "  ✓ Created: $ORCHESTRATOR_ZIP"
 echo ""
 echo "☁️  Uploading to S3..."
 aws s3 mb "s3://${DEPLOY_BUCKET}" --region "$REGION" 2>/dev/null || true
-aws s3 cp "$ORCHESTRATOR_ZIP" "s3://${DEPLOY_BUCKET}/deploy/orchestrator.zip"
-echo "  ✓ Uploaded: s3://${DEPLOY_BUCKET}/deploy/orchestrator.zip"
+aws s3 cp "$ORCHESTRATOR_ZIP" "s3://${DEPLOY_BUCKET}/${ORCHESTRATOR_S3_KEY}"
+echo "  ✓ Uploaded: s3://${DEPLOY_BUCKET}/${ORCHESTRATOR_S3_KEY}"
 
 # Step 5: Deploy CloudFormation stack
 echo ""
 echo "🚀 Deploying CloudFormation stack..."
 
-CFN_PARAMS="ProjectName=$STACK_NAME TestRunnerImageUri=${ECR_URI}:${IMAGE_TAG} OrchestratorCodeS3Bucket=$DEPLOY_BUCKET OrchestratorCodeS3Key=deploy/orchestrator.zip"
+CFN_PARAMS="ProjectName=$STACK_NAME TestRunnerImageUri=${ECR_URI}:${IMAGE_TAG} OrchestratorCodeS3Bucket=$DEPLOY_BUCKET OrchestratorCodeS3Key=${ORCHESTRATOR_S3_KEY}"
 
 if [ -n "$EXISTING_ROLE_ARN" ]; then
     CFN_PARAMS="$CFN_PARAMS ExistingRoleArn=$EXISTING_ROLE_ARN CreateResources=runtimes-only"
