@@ -25,6 +25,17 @@ Parameters:
     Default: ''
     Description: (Optional) Existing S3 bucket for test input/output. If empty, a new bucket is created.
 
+  ExistingRoleArn:
+    Type: String
+    Default: ''
+    Description: (Optional) ARN of a pre-created IAM role for AgentCore runtimes. If empty, a new role is created.
+
+  CreateResources:
+    Type: String
+    Default: 'all'
+    AllowedValues: ['all', 'runtimes-only']
+    Description: "'all' creates IAM role + S3 bucket + runtimes. 'runtimes-only' skips IAM/S3 (use ExistingRoleArn + TestBucket)."
+
 Resources:
   # ============================================================
   # S3 Bucket for test input/output (created only if TestBucket is empty)
@@ -47,10 +58,11 @@ Resources:
         RestrictPublicBuckets: true
 
   # ============================================================
-  # IAM Role for AgentCore Runtimes
+  # IAM Role for AgentCore Runtimes (created only if no ExistingRoleArn)
   # ============================================================
   AgentCoreExecutionRole:
     Type: AWS::IAM::Role
+    Condition: CreateRole
     Properties:
       RoleName: !Sub '${ProjectName}-agentcore-role'
       AssumeRolePolicyDocument:
@@ -134,7 +146,10 @@ Resources:
     Properties:
       AgentRuntimeName: !Sub '${ProjectName}-test-runner'
       Description: Executes individual test scenarios with AgentCore browser
-      RoleArn: !GetAtt AgentCoreExecutionRole.Arn
+      RoleArn: !If
+        - CreateRole
+        - !GetAtt AgentCoreExecutionRole.Arn
+        - !Ref ExistingRoleArn
       ContainerUri: !Ref TestRunnerImageUri
       NetworkMode: PUBLIC
       ServerProtocol: HTTP
@@ -155,7 +170,10 @@ Resources:
     Properties:
       AgentRuntimeName: !Sub '${ProjectName}-orchestrator'
       Description: Orchestrates parallel test execution across Test Runner instances
-      RoleArn: !GetAtt AgentCoreExecutionRole.Arn
+      RoleArn: !If
+        - CreateRole
+        - !GetAtt AgentCoreExecutionRole.Arn
+        - !Ref ExistingRoleArn
       CodeS3Bucket: !Ref OrchestratorCodeS3Bucket
       CodeS3Prefix: !Ref OrchestratorCodeS3Key
       CodeRuntime: PYTHON_3_13
@@ -172,7 +190,12 @@ Resources:
       Name: DEFAULT
 
 Conditions:
-  CreateBucket: !Equals [!Ref TestBucket, '']
+  CreateBucket: !And
+    - !Equals [!Ref TestBucket, '']
+    - !Equals [!Ref CreateResources, 'all']
+  CreateRole: !And
+    - !Equals [!Ref ExistingRoleArn, '']
+    - !Equals [!Ref CreateResources, 'all']
 
 Outputs:
   TestRunnerArn:
@@ -196,7 +219,10 @@ Outputs:
 
   ExecutionRoleArn:
     Description: IAM role ARN for AgentCore runtimes
-    Value: !GetAtt AgentCoreExecutionRole.Arn
+    Value: !If
+      - CreateRole
+      - !GetAtt AgentCoreExecutionRole.Arn
+      - !Ref ExistingRoleArn
 
   InvokeOrchestratorExample:
     Description: Example payload to invoke the Orchestrator
