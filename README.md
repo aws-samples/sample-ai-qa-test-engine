@@ -50,15 +50,61 @@ ai-qa-test translate --feature-dir ./features/
 | **Trajectory Replay** | Cache browser trajectories, replay without AI model calls | Second run auto-replays; `--no-cache` to bypass |
 | **@no-cache Annotation** | Skip trajectory cache for specific steps | `When I click submit @no-cache` always uses Nova Act |
 | **Trajectory Strict** | Validate URL/screenshot/DOM during replay | `--trajectory-strict` fails on page state mismatch |
+| **AgentCore Deploy** | Parallel execution at scale with S3 I/O | `./scripts/deploy.sh` — Orchestrator + N Test Runners |
 | **Screenshot on Fail** | Auto-captures screenshot when a step fails | Embedded in HTML report |
 
 ### Planned (not yet implemented)
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **AgentCore Deploy** | Parallel execution at scale with S3 I/O | Feature 5 |
 | **Gauge Support** | .md + .cpt test format | Feature 6 |
 | **Mobile Testing** | AWS Device Farm integration | Feature 7 |
+
+## AgentCore Deployment (Parallel Execution at Scale)
+
+Deploy the engine to AWS AgentCore for parallel test execution with S3 I/O.
+
+### Architecture
+
+```
+User → Orchestrator Agent → N × Test Runner Agents (parallel)
+         ↕ S3                    ↕ S3 + AgentCore Browser
+```
+
+- **Orchestrator**: Reads .feature files from S3, manages translation cache, fans out scenarios to Test Runners, collects results, generates combined HTML report
+- **Test Runner**: Executes a single scenario using AgentCore's remote browser (CDP), uploads results to S3
+
+### S3 Structure
+
+```
+s3://my-bucket/
+├── my-project/tests/
+│   ├── features/              ← .feature files
+│   ├── translated/            ← translation cache (auto-managed)
+│   ├── tag-url-mapping.json
+│   └── custom-functions/
+│       └── custom_functions.py
+└── my-project/results/
+    └── run-20260520-123456/
+        ├── summary.json
+        ├── combined-report.html
+        └── scenarios/...
+```
+
+### Deploy
+
+```bash
+# Deploy infrastructure (CFN + Docker + S3)
+./scripts/deploy.sh --create-ecr
+
+# Upload tests to S3
+aws s3 sync ./my-tests/ s3://<bucket>/my-project/tests/
+
+# Invoke orchestrator
+aws bedrock-agentcore invoke-agent-runtime \
+  --agent-runtime-arn <orchestrator-arn> \
+  --payload '{"input_bucket":"<bucket>","input_prefix":"my-project/tests/","output_bucket":"<bucket>","output_prefix":"my-project/results","test_runner_arn":"<test-runner-arn>","max_concurrency":10}'
+```
 
 ## Project Structure
 
