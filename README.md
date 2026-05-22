@@ -16,6 +16,22 @@ ai-qa-test run --feature-dir ./features/
 ai-qa-test translate --feature-dir ./features/
 ```
 
+### Windows
+
+The CLI (`ai-qa-test run`, `translate`, `validate`) works natively on Windows with Python 3.11+ and uv. No WSL needed for running tests.
+
+For the bash scripts (`scripts/test-cli.sh`, `scripts/deploy.sh`), use one of:
+- **Windows 11**: WSL2 with WSLg (GUI browser support built-in) — `wsl --install`
+- **Windows 10**: WSL2 + headless mode (`--browser-mode headless`)
+- **Git Bash**: Works for deploy.sh, limited for test-cli.sh (no mkfifo)
+
+```powershell
+# Windows native setup
+uv sync
+cd sample-tests\feature-01-core-execution\
+ai-qa-test run --feature-dir .\features\ --browser-mode headed
+```
+
 ## Features
 
 | Feature | Description | Example |
