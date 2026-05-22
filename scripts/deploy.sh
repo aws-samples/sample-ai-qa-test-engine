@@ -1,16 +1,19 @@
 #!/bin/bash
 # deploy.sh — Deploy AI QA Test Engine to AgentCore via CloudFormation
 #
+# Both agents deploy as CodeZip (no Docker needed).
+# Uses native AWS::BedrockAgentCore::Runtime CFN resources.
+#
 # Prerequisites:
 #   - AWS CLI configured with appropriate credentials
-#   - Docker installed (for building Test Runner container)
-#   - ECR repository created (or use --create-ecr flag)
+#   - zip command available
 #
 # Usage:
-#   ./scripts/deploy.sh                          # Deploy with defaults
+#   ./scripts/deploy.sh                          # Deploy (creates role + bucket)
 #   ./scripts/deploy.sh --stack-name my-stack    # Custom stack name
 #   ./scripts/deploy.sh --region us-west-2       # Custom region
-#   ./scripts/deploy.sh --create-ecr             # Create ECR repo if needed
+#   ./scripts/deploy.sh --role-arn ARN           # Use pre-created IAM role
+#   ./scripts/deploy.sh --test-bucket NAME       # Use pre-created S3 bucket
 
 set -euo pipefail
 
@@ -21,10 +24,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 STACK_NAME="${STACK_NAME:-ai-qa-test-engine}"
 REGION="${AWS_REGION:-us-east-1}"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-ECR_REPO="${STACK_NAME}-test-runner"
-IMAGE_TAG=$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo "latest")
 DEPLOY_BUCKET="${STACK_NAME}-deploy-${ACCOUNT_ID}-${REGION}"
-CREATE_ECR=false
 EXISTING_ROLE_ARN=""
 EXISTING_TEST_BUCKET=""
 
@@ -33,7 +33,6 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --stack-name) STACK_NAME="$2"; shift 2 ;;
         --region) REGION="$2"; shift 2 ;;
-        --create-ecr) CREATE_ECR=true; shift ;;
         --role-arn) EXISTING_ROLE_ARN="$2"; shift 2 ;;
         --test-bucket) EXISTING_TEST_BUCKET="$2"; shift 2 ;;
         --help)
@@ -42,17 +41,18 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --stack-name NAME     CloudFormation stack name (default: ai-qa-test-engine)"
             echo "  --region REGION       AWS region (default: us-east-1)"
-            echo "  --create-ecr          Create ECR repository if it doesn't exist"
             echo "  --role-arn ARN        Use pre-created IAM role (skip role creation)"
             echo "  --test-bucket NAME    Use pre-created S3 bucket (skip bucket creation)"
             echo ""
             echo "Examples:"
-            echo "  ./scripts/deploy.sh --create-ecr                    # Full deploy (creates everything)"
-            echo "  ./scripts/deploy.sh --role-arn arn:aws:iam::123:role/my-role --test-bucket my-bucket"
+            echo "  ./scripts/deploy.sh                                     # Full deploy (creates role + bucket)"
+            echo "  ./scripts/deploy.sh --role-arn arn:aws:iam::123:role/r --test-bucket my-bucket"
             exit 0 ;;
         *) echo "Unknown option: $1. Use --help for usage."; exit 1 ;;
     esac
 done
+
+DEPLOY_TIMESTAMP=$(date +%Y%m%d%H%M%S)
 
 echo "=============================================="
 echo "AI QA Test Engine — AgentCore Deployment"
@@ -60,70 +60,62 @@ echo "=============================================="
 echo "  Stack:    $STACK_NAME"
 echo "  Region:   $REGION"
 echo "  Account:  $ACCOUNT_ID"
-echo "  ECR Repo: $ECR_REPO"
-echo ""
-
-# Step 1: Create ECR repository if needed
-ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPO}"
-
-if [ "$CREATE_ECR" = true ]; then
-    echo "📦 Creating ECR repository..."
-    aws ecr create-repository \
-        --repository-name "$ECR_REPO" \
-        --region "$REGION" \
-        --image-scanning-configuration scanOnPush=true \
-        2>/dev/null || echo "  (already exists)"
+echo "  Deploy:   CodeZip via CloudFormation (no Docker)"
+if [ -n "$EXISTING_ROLE_ARN" ]; then
+    echo "  Role:     $EXISTING_ROLE_ARN (pre-created)"
+else
+    echo "  Role:     (will be created by CFN)"
 fi
-
-# Step 2: Build and push Test Runner container
+if [ -n "$EXISTING_TEST_BUCKET" ]; then
+    echo "  Bucket:   $EXISTING_TEST_BUCKET (pre-created)"
+else
+    echo "  Bucket:   (will be created by CFN)"
+fi
 echo ""
-echo "🐳 Building Test Runner container..."
+
+# Step 1: Create deploy bucket for code zips
+echo "☁️  Ensuring deploy bucket exists..."
+aws s3 mb "s3://${DEPLOY_BUCKET}" --region "$REGION" 2>/dev/null || true
+echo "  ✓ Bucket: $DEPLOY_BUCKET"
+
+# Step 2: Package and upload Test Runner
+echo ""
+echo "📦 Packaging Test Runner..."
 cd "$PROJECT_ROOT/packages/agentcore-runner"
 
-# Login to ECR
-aws ecr get-login-password --region "$REGION" | \
-    docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+RUNNER_S3_KEY="deploy/test-runner-${DEPLOY_TIMESTAMP}.zip"
+RUNNER_ZIP="/tmp/${STACK_NAME}-test-runner.zip"
+zip -r "$RUNNER_ZIP" main.py scenario_executor.py s3_utils.py pyproject.toml
+aws s3 cp "$RUNNER_ZIP" "s3://${DEPLOY_BUCKET}/${RUNNER_S3_KEY}" --quiet
+echo "  ✓ Uploaded: s3://${DEPLOY_BUCKET}/${RUNNER_S3_KEY}"
 
-# Build
-docker build -t "${ECR_REPO}:${IMAGE_TAG}" .
-
-# Tag and push
-docker tag "${ECR_REPO}:${IMAGE_TAG}" "${ECR_URI}:${IMAGE_TAG}"
-docker push "${ECR_URI}:${IMAGE_TAG}"
-echo "  ✓ Pushed: ${ECR_URI}:${IMAGE_TAG}"
-
-# Step 3: Package Orchestrator code zip
+# Step 3: Package and upload Orchestrator
 echo ""
 echo "📦 Packaging Orchestrator..."
 cd "$PROJECT_ROOT/packages/agentcore-orchestrator"
 
-DEPLOY_TIMESTAMP=$(date +%Y%m%d%H%M%S)
 ORCHESTRATOR_S3_KEY="deploy/orchestrator-${DEPLOY_TIMESTAMP}.zip"
 ORCHESTRATOR_ZIP="/tmp/${STACK_NAME}-orchestrator.zip"
 zip -r "$ORCHESTRATOR_ZIP" main.py invoker.py s3_utils.py reporting.py pyproject.toml
-echo "  ✓ Created: $ORCHESTRATOR_ZIP"
-
-# Step 4: Create deploy bucket and upload orchestrator zip
-echo ""
-echo "☁️  Uploading to S3..."
-aws s3 mb "s3://${DEPLOY_BUCKET}" --region "$REGION" 2>/dev/null || true
-aws s3 cp "$ORCHESTRATOR_ZIP" "s3://${DEPLOY_BUCKET}/${ORCHESTRATOR_S3_KEY}"
+aws s3 cp "$ORCHESTRATOR_ZIP" "s3://${DEPLOY_BUCKET}/${ORCHESTRATOR_S3_KEY}" --quiet
 echo "  ✓ Uploaded: s3://${DEPLOY_BUCKET}/${ORCHESTRATOR_S3_KEY}"
 
-# Step 5: Deploy CloudFormation stack
+# Step 4: Deploy CloudFormation stack
 echo ""
 echo "🚀 Deploying CloudFormation stack..."
 
-CFN_PARAMS="ProjectName=$STACK_NAME TestRunnerImageUri=${ECR_URI}:${IMAGE_TAG} OrchestratorCodeS3Bucket=$DEPLOY_BUCKET OrchestratorCodeS3Key=${ORCHESTRATOR_S3_KEY}"
+CFN_PARAMS="ProjectName=$STACK_NAME"
+CFN_PARAMS="$CFN_PARAMS TestRunnerCodeS3Bucket=$DEPLOY_BUCKET TestRunnerCodeS3Key=${RUNNER_S3_KEY}"
+CFN_PARAMS="$CFN_PARAMS OrchestratorCodeS3Bucket=$DEPLOY_BUCKET OrchestratorCodeS3Key=${ORCHESTRATOR_S3_KEY}"
 
 if [ -n "$EXISTING_ROLE_ARN" ]; then
-    CFN_PARAMS="$CFN_PARAMS ExistingRoleArn=$EXISTING_ROLE_ARN CreateResources=runtimes-only"
-    echo "  Using existing role: $EXISTING_ROLE_ARN"
+    CFN_PARAMS="$CFN_PARAMS ExistingRoleArn=$EXISTING_ROLE_ARN"
+    echo "  Using existing role"
 fi
 
 if [ -n "$EXISTING_TEST_BUCKET" ]; then
     CFN_PARAMS="$CFN_PARAMS TestBucket=$EXISTING_TEST_BUCKET"
-    echo "  Using existing bucket: $EXISTING_TEST_BUCKET"
+    echo "  Using existing bucket"
 fi
 
 aws cloudformation deploy \
@@ -138,7 +130,7 @@ echo ""
 echo "✓ Deployment complete!"
 echo ""
 
-# Step 6: Show outputs
+# Step 5: Show outputs
 echo "📋 Stack Outputs:"
 aws cloudformation describe-stacks \
     --stack-name "$STACK_NAME" \
@@ -152,8 +144,5 @@ echo "Next steps:"
 echo "  1. Upload test files to S3:"
 echo "     aws s3 sync ./my-tests/ s3://<bucket>/my-project/tests/"
 echo ""
-echo "  2. Invoke the Orchestrator:"
-echo "     aws bedrock-agentcore invoke-agent-runtime \\"
-echo "       --agent-runtime-arn <orchestrator-arn> \\"
-echo "       --payload '{\"input_bucket\":\"<bucket>\",\"input_prefix\":\"my-project/tests/\",\"output_bucket\":\"<bucket>\",\"output_prefix\":\"my-project/results\",\"test_runner_arn\":\"<test-runner-arn>\",\"max_concurrency\":10}'"
+echo "  2. Invoke the Orchestrator (see InvokeExample output above)"
 echo "=============================================="

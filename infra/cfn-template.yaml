@@ -7,9 +7,20 @@ Parameters:
     Default: ai-qa-test-engine
     Description: Project name used for resource naming
 
-  TestRunnerImageUri:
+  NetworkMode:
     Type: String
-    Description: ECR image URI for the Test Runner container (e.g., 123456789012.dkr.ecr.us-east-1.amazonaws.com/ai-qa-test-runner:latest)
+    Default: PUBLIC
+    AllowedValues: [PUBLIC, PRIVATE]
+    Description: Network mode for AgentCore runtimes
+
+  TestRunnerCodeS3Bucket:
+    Type: String
+    Description: S3 bucket containing the Test Runner code zip
+
+  TestRunnerCodeS3Key:
+    Type: String
+    Default: deploy/test-runner.zip
+    Description: S3 key for the Test Runner code zip
 
   OrchestratorCodeS3Bucket:
     Type: String
@@ -23,22 +34,20 @@ Parameters:
   TestBucket:
     Type: String
     Default: ''
-    Description: (Optional) Existing S3 bucket for test input/output. If empty, a new bucket is created.
+    Description: (Optional) Existing S3 bucket for test I/O. If empty, a new bucket is created.
 
   ExistingRoleArn:
     Type: String
     Default: ''
-    Description: (Optional) ARN of a pre-created IAM role for AgentCore runtimes. If empty, a new role is created.
+    Description: (Optional) ARN of a pre-created IAM role. If empty, a new role is created.
 
-  CreateResources:
-    Type: String
-    Default: 'all'
-    AllowedValues: ['all', 'runtimes-only']
-    Description: "'all' creates IAM role + S3 bucket + runtimes. 'runtimes-only' skips IAM/S3 (use ExistingRoleArn + TestBucket)."
+Conditions:
+  CreateBucket: !Equals [!Ref TestBucket, '']
+  CreateRole: !Equals [!Ref ExistingRoleArn, '']
 
 Resources:
   # ============================================================
-  # S3 Bucket for test input/output (created only if TestBucket is empty)
+  # S3 Bucket (optional — created only if TestBucket is empty)
   # ============================================================
   TestDataBucket:
     Type: AWS::S3::Bucket
@@ -58,7 +67,7 @@ Resources:
         RestrictPublicBuckets: true
 
   # ============================================================
-  # IAM Role for AgentCore Runtimes (created only if no ExistingRoleArn)
+  # IAM Role (optional — created only if ExistingRoleArn is empty)
   # ============================================================
   AgentCoreExecutionRole:
     Type: AWS::IAM::Role
@@ -72,166 +81,161 @@ Resources:
             Principal:
               Service: bedrock-agentcore.amazonaws.com
             Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/BedrockAgentCoreFullAccess
       Policies:
-        - PolicyName: S3Access
+        - PolicyName: TestEnginePolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Effect: Allow
+              - Sid: S3Access
+                Effect: Allow
                 Action:
                   - s3:GetObject
                   - s3:PutObject
                   - s3:ListBucket
                   - s3:HeadObject
                 Resource:
-                  - !If
-                    - CreateBucket
-                    - !GetAtt TestDataBucket.Arn
-                    - !Sub 'arn:aws:s3:::${TestBucket}'
-                  - !If
-                    - CreateBucket
-                    - !Sub '${TestDataBucket.Arn}/*'
-                    - !Sub 'arn:aws:s3:::${TestBucket}/*'
-        - PolicyName: BedrockAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
+                  - !If [CreateBucket, !GetAtt TestDataBucket.Arn, !Sub 'arn:aws:s3:::${TestBucket}']
+                  - !If [CreateBucket, !Sub '${TestDataBucket.Arn}/*', !Sub 'arn:aws:s3:::${TestBucket}/*']
+              - Sid: BedrockModelAccess
+                Effect: Allow
                 Action:
                   - bedrock:InvokeModel
                   - bedrock:InvokeModelWithResponseStream
                 Resource: '*'
-        - PolicyName: AgentCoreInvoke
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
+              - Sid: AgentCoreInvoke
+                Effect: Allow
                 Action:
                   - bedrock-agentcore:InvokeAgentRuntime
                 Resource: !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:runtime/*'
-        - PolicyName: NovaActWorkflow
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
+              - Sid: NovaAct
+                Effect: Allow
                 Action:
                   - nova-act:*
                 Resource: '*'
-        - PolicyName: AgentCoreBrowser
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
+              - Sid: AgentCoreBrowser
+                Effect: Allow
                 Action:
                   - bedrock-agentcore:CreateBrowserSession
                   - bedrock-agentcore:GetBrowserSession
                   - bedrock-agentcore:StopBrowserSession
                 Resource: '*'
-        - PolicyName: CloudWatchLogs
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
+              - Sid: CloudWatchLogs
+                Effect: Allow
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
                 Resource: '*'
+              - Sid: XRayTracing
+                Effect: Allow
+                Action:
+                  - xray:PutTraceSegments
+                  - xray:PutTelemetryRecords
+                  - xray:GetSamplingRules
+                  - xray:GetSamplingTargets
+                Resource: '*'
+              - Sid: GetAgentAccessToken
+                Effect: Allow
+                Action:
+                  - bedrock-agentcore:GetWorkloadAccessToken
+                  - bedrock-agentcore:GetWorkloadAccessTokenForJWT
+                  - bedrock-agentcore:GetWorkloadAccessTokenForUserId
+                Resource:
+                  - !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:workload-identity-directory/default'
+                  - !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:workload-identity-directory/default/workload-identity/*'
 
   # ============================================================
-  # Test Runner Runtime (Container-based)
+  # Test Runner Runtime (CodeZip — uses AgentCore browser_session)
   # ============================================================
   TestRunnerRuntime:
-    Type: AWS::BedrockAgentCore::AgentRuntime
+    Type: AWS::BedrockAgentCore::Runtime
     Properties:
-      AgentRuntimeName: !Sub '${ProjectName}-test-runner'
-      Description: Executes individual test scenarios with AgentCore browser
-      RoleArn: !If
-        - CreateRole
-        - !GetAtt AgentCoreExecutionRole.Arn
-        - !Ref ExistingRoleArn
-      ContainerUri: !Ref TestRunnerImageUri
-      NetworkMode: PUBLIC
-      ServerProtocol: HTTP
-      IdleTimeout: 900
-      MaxLifetime: 28800
-
-  TestRunnerEndpoint:
-    Type: AWS::BedrockAgentCore::AgentRuntimeEndpoint
-    Properties:
-      AgentRuntimeId: !Ref TestRunnerRuntime
-      Name: DEFAULT
+      AgentRuntimeName: !Sub
+        - '${StackUnderscore}_test_runner'
+        - StackUnderscore: !Join ['_', !Split ['-', !Ref ProjectName]]
+      AgentRuntimeArtifact:
+        CodeConfiguration:
+          Code:
+            S3:
+              Bucket: !Ref TestRunnerCodeS3Bucket
+              Prefix: !Ref TestRunnerCodeS3Key
+          Runtime: PYTHON_3_13
+          EntryPoint:
+            - main.py
+      RoleArn: !If [CreateRole, !GetAtt AgentCoreExecutionRole.Arn, !Ref ExistingRoleArn]
+      NetworkConfiguration:
+        NetworkMode: !Ref NetworkMode
+      Description: 'AI QA Test Engine — Test Runner (executes scenarios with AgentCore browser)'
 
   # ============================================================
-  # Orchestrator Runtime (CodeZip-based)
+  # Orchestrator Runtime (CodeZip — fans out parallel invocations)
   # ============================================================
   OrchestratorRuntime:
-    Type: AWS::BedrockAgentCore::AgentRuntime
+    Type: AWS::BedrockAgentCore::Runtime
+    DependsOn: TestRunnerRuntime
     Properties:
-      AgentRuntimeName: !Sub '${ProjectName}-orchestrator'
-      Description: Orchestrates parallel test execution across Test Runner instances
-      RoleArn: !If
-        - CreateRole
-        - !GetAtt AgentCoreExecutionRole.Arn
-        - !Ref ExistingRoleArn
-      CodeS3Bucket: !Ref OrchestratorCodeS3Bucket
-      CodeS3Prefix: !Ref OrchestratorCodeS3Key
-      CodeRuntime: PYTHON_3_13
-      CodeEntryPoint: main.py
-      NetworkMode: PUBLIC
-      ServerProtocol: HTTP
-      IdleTimeout: 900
-      MaxLifetime: 28800
-
-  OrchestratorEndpoint:
-    Type: AWS::BedrockAgentCore::AgentRuntimeEndpoint
-    Properties:
-      AgentRuntimeId: !Ref OrchestratorRuntime
-      Name: DEFAULT
-
-Conditions:
-  CreateBucket: !And
-    - !Equals [!Ref TestBucket, '']
-    - !Equals [!Ref CreateResources, 'all']
-  CreateRole: !And
-    - !Equals [!Ref ExistingRoleArn, '']
-    - !Equals [!Ref CreateResources, 'all']
+      AgentRuntimeName: !Sub
+        - '${StackUnderscore}_orchestrator'
+        - StackUnderscore: !Join ['_', !Split ['-', !Ref ProjectName]]
+      AgentRuntimeArtifact:
+        CodeConfiguration:
+          Code:
+            S3:
+              Bucket: !Ref OrchestratorCodeS3Bucket
+              Prefix: !Ref OrchestratorCodeS3Key
+          Runtime: PYTHON_3_13
+          EntryPoint:
+            - main.py
+      RoleArn: !If [CreateRole, !GetAtt AgentCoreExecutionRole.Arn, !Ref ExistingRoleArn]
+      NetworkConfiguration:
+        NetworkMode: !Ref NetworkMode
+      Description: 'AI QA Test Engine — Orchestrator (parallel test execution from S3)'
+      EnvironmentVariables:
+        TEST_RUNNER_ARN: !GetAtt TestRunnerRuntime.AgentRuntimeArn
 
 Outputs:
+  TestRunnerRuntimeId:
+    Description: Test Runner runtime ID
+    Value: !GetAtt TestRunnerRuntime.AgentRuntimeId
+
   TestRunnerArn:
-    Description: ARN of the Test Runner AgentCore Runtime
+    Description: Test Runner runtime ARN (pass to orchestrator payload)
     Value: !GetAtt TestRunnerRuntime.AgentRuntimeArn
     Export:
       Name: !Sub '${ProjectName}-test-runner-arn'
 
+  OrchestratorRuntimeId:
+    Description: Orchestrator runtime ID
+    Value: !GetAtt OrchestratorRuntime.AgentRuntimeId
+
   OrchestratorArn:
-    Description: ARN of the Orchestrator AgentCore Runtime
+    Description: Orchestrator runtime ARN (invoke this to run tests)
     Value: !GetAtt OrchestratorRuntime.AgentRuntimeArn
     Export:
       Name: !Sub '${ProjectName}-orchestrator-arn'
 
   TestBucketName:
     Description: S3 bucket for test input/output
-    Value: !If
-      - CreateBucket
-      - !Ref TestDataBucket
-      - !Ref TestBucket
+    Value: !If [CreateBucket, !Ref TestDataBucket, !Ref TestBucket]
 
   ExecutionRoleArn:
-    Description: IAM role ARN for AgentCore runtimes
-    Value: !If
-      - CreateRole
-      - !GetAtt AgentCoreExecutionRole.Arn
-      - !Ref ExistingRoleArn
+    Description: IAM role ARN used by runtimes
+    Value: !If [CreateRole, !GetAtt AgentCoreExecutionRole.Arn, !Ref ExistingRoleArn]
 
-  InvokeOrchestratorExample:
-    Description: Example payload to invoke the Orchestrator
-    Value: !Sub |
-      {
-        "input_bucket": "${TestDataBucket}",
-        "input_prefix": "my-project/tests/",
-        "output_bucket": "${TestDataBucket}",
-        "output_prefix": "my-project/results",
-        "test_runner_arn": "${TestRunnerRuntime.AgentRuntimeArn}",
-        "max_concurrency": 10
-      }
+  InvokeExample:
+    Description: Example command to invoke the orchestrator
+    Value: !Sub
+      - |
+        aws bedrock-agentcore invoke-agent-runtime --agent-runtime-arn ${OrchestratorArn} --payload '{"input_bucket":"${Bucket}","input_prefix":"my-project/tests/","output_bucket":"${Bucket}","output_prefix":"my-project/results","test_runner_arn":"${RunnerArn}","max_concurrency":10}'
+      - OrchestratorArn: !GetAtt OrchestratorRuntime.AgentRuntimeArn
+        RunnerArn: !GetAtt TestRunnerRuntime.AgentRuntimeArn
+        Bucket: !If [CreateBucket, !Ref TestDataBucket, !Ref TestBucket]
