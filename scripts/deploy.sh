@@ -53,6 +53,24 @@ CFN_PARAMS="ProjectName=$STACK_NAME"
 [ -n "$EXISTING_ROLE_ARN" ] && CFN_PARAMS="$CFN_PARAMS ExistingRoleArn=$EXISTING_ROLE_ARN"
 [ -n "$EXISTING_TEST_BUCKET" ] && CFN_PARAMS="$CFN_PARAMS TestBucket=$EXISTING_TEST_BUCKET"
 
+# Upload agent source zips to S3 for CodeBuild
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+DEPLOY_BUCKET="${STACK_NAME}-deploy-${ACCOUNT_ID}-${REGION}"
+echo "📦 Uploading agent source..."
+aws s3 mb "s3://${DEPLOY_BUCKET}" --region "$REGION" 2>/dev/null || true
+
+cd "$PROJECT_ROOT/packages/agentcore-runner"
+zip -r /tmp/agentcore-runner.zip main.py scenario_executor.py s3_utils.py pyproject.toml -x '*.pyc' --quiet
+aws s3 cp /tmp/agentcore-runner.zip "s3://${DEPLOY_BUCKET}/source/agentcore-runner.zip" --quiet
+
+cd "$PROJECT_ROOT/packages/agentcore-orchestrator"
+zip -r /tmp/agentcore-orchestrator.zip main.py invoker.py s3_utils.py reporting.py pyproject.toml -x '*.pyc' --quiet
+aws s3 cp /tmp/agentcore-orchestrator.zip "s3://${DEPLOY_BUCKET}/source/agentcore-orchestrator.zip" --quiet
+echo "  ✓ Source: s3://${DEPLOY_BUCKET}/source/"
+
+cd "$PROJECT_ROOT"
+CFN_PARAMS="$CFN_PARAMS SourceBucket=$DEPLOY_BUCKET"
+
 echo "🚀 Deploying (first deploy takes ~5-8 min for CodeBuild)..."
 aws cloudformation deploy \
     --template-file "$PROJECT_ROOT/infra/cfn-template.yaml" \

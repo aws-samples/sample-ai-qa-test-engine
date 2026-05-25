@@ -22,6 +22,11 @@ Parameters:
     Default: ''
     Description: (Optional) Pre-created IAM role ARN
 
+  SourceBucket:
+    Type: String
+    Default: ''
+    Description: S3 bucket containing agent source zips (set by deploy.sh)
+
 Conditions:
   CreateBucket: !Equals [!Ref TestBucket, '']
   CreateRole: !Equals [!Ref ExistingRoleArn, '']
@@ -148,6 +153,9 @@ Resources:
               - Effect: Allow
                 Action: [ecr:BatchCheckLayerAvailability, ecr:GetDownloadUrlForLayer, ecr:BatchGetImage, ecr:GetAuthorizationToken, ecr:PutImage, ecr:InitiateLayerUpload, ecr:UploadLayerPart, ecr:CompleteLayerUpload]
                 Resource: '*'
+              - Effect: Allow
+                Action: [s3:GetObject, s3:ListBucket]
+                Resource: '*'
 
   # ============================================================
   # IAM — Lambda Custom Resource Role
@@ -249,9 +257,11 @@ Resources:
             Value: !Ref TestRunnerECR
           - Name: IMAGE_TAG
             Value: latest
+          - Name: SOURCE_BUCKET
+            Value: !Ref SourceBucket
       Source:
         Type: NO_SOURCE
-        BuildSpec: !Sub |
+        BuildSpec: |
           version: 0.2
           phases:
             pre_build:
@@ -259,6 +269,21 @@ Resources:
                 - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
             build:
               commands:
+                - echo "Downloading source from S3..."
+                - aws s3 cp s3://$SOURCE_BUCKET/source/agentcore-runner.zip /tmp/source.zip
+                - unzip -o /tmp/source.zip -d .
+                - |
+                  cat > Dockerfile << 'EOF'
+                  FROM public.ecr.aws/docker/library/python:3.13-slim
+                  WORKDIR /app
+                  COPY requirements.txt .
+                  RUN pip install --no-cache-dir -r requirements.txt
+                  RUN useradd -m -u 1000 bedrock_agentcore
+                  USER bedrock_agentcore
+                  EXPOSE 8080
+                  COPY . .
+                  CMD ["opentelemetry-instrument", "python", "main.py"]
+                  EOF
                 - |
                   cat > requirements.txt << 'EOF'
                   bedrock-agentcore>=1.0.3
@@ -269,46 +294,7 @@ Resources:
                   python-dotenv>=1.0.0
                   gherkin-official>=28.0.0
                   openpyxl>=3.1.0
-                  strands-agents>=1.0
                   aws-opentelemetry-distro
-                  EOF
-                - |
-                  cat > main.py << 'PYEOF'
-                  """Test Runner Agent — AgentCore Entrypoint"""
-                  import json, logging, os, time
-                  from pathlib import Path
-                  from bedrock_agentcore.runtime import BedrockAgentCoreApp
-                  logging.basicConfig(level=logging.INFO)
-                  logger = logging.getLogger(__name__)
-                  app = BedrockAgentCoreApp()
-                  @app.entrypoint
-                  def handler(payload):
-                      if isinstance(payload, str):
-                          payload = json.loads(payload)
-                      if isinstance(payload, dict) and "prompt" in payload and "scenario" not in payload:
-                          p = payload["prompt"]
-                          if isinstance(p, str):
-                              try: payload = json.loads(p)
-                              except: pass
-                          elif isinstance(p, dict): payload = p
-                      action = payload.get("action", "execute")
-                      if action == "translate":
-                          return {"status": "SUCCESS", "action": "translate", "translated": {}}
-                      return {"status": "PASSED", "scenario_name": payload.get("scenario_name","unknown"), "steps_total": 0}
-                  if __name__ == "__main__":
-                      app.run()
-                  PYEOF
-                - |
-                  cat > Dockerfile << 'EOF'
-                  FROM public.ecr.aws/docker/library/python:3.13-slim
-                  WORKDIR /app
-                  COPY requirements.txt .
-                  RUN pip install --no-cache-dir -r requirements.txt
-                  RUN useradd -m -u 1000 bedrock_agentcore
-                  USER bedrock_agentcore
-                  EXPOSE 8080
-                  COPY main.py .
-                  CMD ["opentelemetry-instrument", "python", "main.py"]
                   EOF
                 - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
                 - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
@@ -340,9 +326,11 @@ Resources:
             Value: !Ref OrchestratorECR
           - Name: IMAGE_TAG
             Value: latest
+          - Name: SOURCE_BUCKET
+            Value: !Ref SourceBucket
       Source:
         Type: NO_SOURCE
-        BuildSpec: !Sub |
+        BuildSpec: |
           version: 0.2
           phases:
             pre_build:
@@ -350,46 +338,9 @@ Resources:
                 - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
             build:
               commands:
-                - |
-                  cat > requirements.txt << 'EOF'
-                  bedrock-agentcore>=1.0.3
-                  boto3
-                  aws-opentelemetry-distro
-                  EOF
-                - |
-                  cat > main.py << 'PYEOF'
-                  """Orchestrator Agent — AgentCore Entrypoint"""
-                  import asyncio, json, logging, os, time
-                  from datetime import datetime, timezone
-                  from uuid import uuid4
-                  import boto3
-                  from botocore.config import Config
-                  from bedrock_agentcore.runtime import BedrockAgentCoreApp
-                  logging.basicConfig(level=logging.INFO)
-                  logger = logging.getLogger(__name__)
-                  app = BedrockAgentCoreApp()
-                  AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-                  @app.entrypoint
-                  def handler(payload):
-                      if isinstance(payload, str): payload = json.loads(payload)
-                      if isinstance(payload, dict) and "prompt" in payload and "input_bucket" not in payload:
-                          p = payload["prompt"]
-                          if isinstance(p, str):
-                              try: payload = json.loads(p)
-                              except: pass
-                          elif isinstance(p, dict): payload = p
-                      input_bucket = payload.get("input_bucket")
-                      output_bucket = payload.get("output_bucket")
-                      test_runner_arn = payload.get("test_runner_arn")
-                      max_concurrency = payload.get("max_concurrency", 10)
-                      if not all([input_bucket, output_bucket, test_runner_arn]):
-                          return {"status": "ERROR", "errors": ["Missing required fields"]}
-                      run_id = f"run-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:6]}"
-                      logger.info(f"Run: {run_id}")
-                      return {"status": "PASSED", "run_id": run_id, "total_scenarios": 0, "passed": 0, "failed": 0}
-                  if __name__ == "__main__":
-                      app.run()
-                  PYEOF
+                - echo "Downloading source from S3..."
+                - aws s3 cp s3://$SOURCE_BUCKET/source/agentcore-orchestrator.zip /tmp/source.zip
+                - unzip -o /tmp/source.zip -d .
                 - |
                   cat > Dockerfile << 'EOF'
                   FROM public.ecr.aws/docker/library/python:3.13-slim
@@ -399,8 +350,14 @@ Resources:
                   RUN useradd -m -u 1000 bedrock_agentcore
                   USER bedrock_agentcore
                   EXPOSE 8080
-                  COPY main.py .
+                  COPY . .
                   CMD ["opentelemetry-instrument", "python", "main.py"]
+                  EOF
+                - |
+                  cat > requirements.txt << 'EOF'
+                  bedrock-agentcore>=1.0.3
+                  boto3
+                  aws-opentelemetry-distro
                   EOF
                 - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
                 - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
