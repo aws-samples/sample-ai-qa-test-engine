@@ -9,10 +9,12 @@ Feature: Data Extraction
     When I navigate to the destinations section
     And I select "Proxima Centauri b" from the destinations
 
+  @id:TC-EXT-001
   Scenario: Extract and verify destination name
     When I extract the destination name and store it as "destination_name"
     Then I should see the destination name matches "${destination_name}"
 
+  @id:TC-EXT-002
   Scenario: Extract multiple values
     When I extract the destination name and store it as "destination_name"
     And I extract the mass as a string and store it as "mass_info"

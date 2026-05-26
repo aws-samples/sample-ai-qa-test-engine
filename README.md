@@ -65,6 +65,7 @@ ai-qa-test run --feature-dir .\features\ --browser-mode headed
 | **Force Re-translate** | Bypass cache and re-translate all features | `--force-translate` |
 | **Trajectory Replay** | Cache browser trajectories, replay without AI model calls | Second run auto-replays; `--no-cache` to bypass |
 | **@no-cache Annotation** | Skip trajectory cache for specific steps | `When I click submit @no-cache` always uses Nova Act |
+| **@id Tag** | Assign explicit scenario IDs for stable naming | `@id:TC-001` → used in workflow names, S3 paths, reports |
 | **Trajectory Strict** | Validate URL/screenshot/DOM during replay | `--trajectory-strict` fails on page state mismatch |
 | **AgentCore Deploy** | Parallel execution at scale with S3 I/O | `./scripts/deploy.sh` — Orchestrator + N Test Runners |
 | **Screenshot on Fail** | Auto-captures screenshot when a step fails | Embedded in HTML report |
@@ -166,6 +167,48 @@ Configuration is loaded from (in order of precedence):
 4. Defaults
 
 See `sample-tests/feature-01-core-execution/.env` for a complete example.
+
+## Scenario IDs
+
+Each scenario gets a canonical ID used for workflow names, S3 paths, and extracted variable files.
+
+**Option 1: Explicit `@id` tag (recommended for stable IDs)**
+
+```gherkin
+@id:TC-LOGIN-001
+Scenario: Successful login
+  Given I am on the login page
+  ...
+```
+
+The ID `TC-LOGIN-001` is used everywhere: workflow definition, S3 result path, extracted variables key.
+
+**Option 2: Auto-generated (fallback)**
+
+Without `@id`, the ID is derived from: `{filename}__{feature_slug}__{scenario_slug}`
+
+Example: `extraction__data_extraction__extract_and_verify_destination_name`
+
+**Extracted variables output format:**
+
+```json
+// extracted_variables/data_extraction.json
+{
+  "feature": "Data Extraction",
+  "scenarios": {
+    "tc_ext_001": {
+      "scenario_name": "Extract and verify destination name",
+      "scenario_id": "tc_ext_001",
+      "variables": {"destination_name": "Proxima Centauri b"}
+    },
+    "tc_ext_002": {
+      "scenario_name": "Extract multiple values",
+      "scenario_id": "tc_ext_002",
+      "variables": {"destination_name": "Proxima Centauri b", "mass_info": "1.27 Earth masses"}
+    }
+  }
+}
+```
 
 ## Writing Tests
 
