@@ -20,10 +20,10 @@ ai-qa-test translate --feature-dir . --tag-url-map-file ./tag-url-mapping.json
 
 The CLI (`ai-qa-test run`, `translate`, `validate`) works natively on Windows with Python 3.11+ and uv. No WSL needed for running tests.
 
-For the bash scripts (`scripts/test-cli.sh`, `scripts/deploy.sh`), use one of:
+For the bash scripts (`scripts/test-cli.sh`, `scripts/deploy-infra.sh`, `scripts/update-agent.sh`), use one of:
 - **Windows 11**: WSL2 with WSLg (GUI browser support built-in) — `wsl --install`
 - **Windows 10**: WSL2 + headless mode (`--browser-mode headless`)
-- **Git Bash**: Works for deploy.sh, limited for test-cli.sh (no mkfifo)
+- **Git Bash**: Works for deploy/update scripts, limited for test-cli.sh (no mkfifo)
 
 ```powershell
 # Windows native setup
@@ -67,7 +67,7 @@ ai-qa-test run --feature-dir .\features\ --browser-mode headed
 | **@no-cache Annotation** | Skip trajectory cache for specific steps | [`08-trajectory-replay/trajectory.feature`](examples/08-trajectory-replay/trajectory.feature) |
 | **@id Tag** | Assign explicit scenario IDs for stable naming | [`02-extraction-validation/extraction.feature`](examples/02-extraction-validation/extraction.feature) |
 | **Trajectory Strict** | Validate URL/screenshot/DOM during replay | `--trajectory-strict` fails on page state mismatch |
-| **AgentCore Deploy** | Parallel execution at scale with S3 I/O | `./scripts/deploy.sh` |
+| **AgentCore Deploy** | Parallel execution at scale with S3 I/O | `./scripts/deploy-infra.sh` + `./scripts/update-agent.sh` |
 | **Screenshot on Fail** | Auto-captures screenshot when a step fails | Embedded in HTML report |
 
 ### Planned (not yet implemented)
@@ -108,12 +108,56 @@ s3://my-bucket/
         └── scenarios/...
 ```
 
-### Deploy
+### Two-Team Deployment Model
+
+The deployment is split into two scripts for separation of concerns:
+
+| Script | Who | When | What |
+|--------|-----|------|------|
+| `scripts/deploy-infra.sh` | Admin team | One-time (or infra changes) | Creates ECR, CodeBuild, IAM roles, S3, AgentCore runtimes via CFN |
+| `scripts/update-agent.sh` | Developer team | Every code change | Rebuilds containers + updates runtimes (no CFN, no admin) |
+
+### Step 1: Admin — Pre-create IAM Role (Optional)
+
+If your org requires pre-created roles, hand your admin `infra/iam-policy-reference.json`. They create the role and give you the ARN.
+
+### Step 2: Admin — Deploy Infrastructure (One-Time)
 
 ```bash
-# Deploy infrastructure (CFN + Docker + S3)
-./scripts/deploy.sh --create-ecr
+# With pre-created role
+./scripts/deploy-infra.sh --role-arn arn:aws:iam::123456789012:role/my-role
 
+# Or let CFN create the role
+./scripts/deploy-infra.sh
+```
+
+This creates all infrastructure and builds the initial container images (~5-8 min).
+
+### Step 3: Admin — Grant Developer Permissions
+
+Attach `infra/iam-developer-policy.json` to the developer team's IAM role. This gives them permission to rebuild containers and update runtimes without any IAM or CFN access.
+
+### Step 4: Developer — Update Agent Code (Ongoing)
+
+```bash
+# Update both agents (~2-3 min)
+./scripts/update-agent.sh
+
+# Update only the test runner
+./scripts/update-agent.sh --runner-only
+
+# Update only the orchestrator
+./scripts/update-agent.sh --orchestrator-only
+
+# Fire and forget (don't wait for build)
+./scripts/update-agent.sh --no-wait
+```
+
+No CloudFormation, no admin involvement. Just rebuilds the container and tells AgentCore to pick up the new image.
+
+### Step 5: Invoke
+
+```bash
 # Upload tests to S3
 aws s3 sync ./my-tests/ s3://<bucket>/my-project/tests/
 
@@ -122,6 +166,14 @@ aws bedrock-agentcore invoke-agent-runtime \
   --agent-runtime-arn <orchestrator-arn> \
   --payload '{"input_bucket":"<bucket>","input_prefix":"my-project/tests/","output_bucket":"<bucket>","output_prefix":"my-project/results","test_runner_arn":"<test-runner-arn>","max_concurrency":10}'
 ```
+
+### IAM Reference Files
+
+| File | Audience | Purpose |
+|------|----------|---------|
+| `infra/iam-policy-reference.json` | Admin | AgentCore execution role (what the runtime assumes at runtime) |
+| `infra/iam-developer-policy.json` | Admin | Developer permissions (what devs need for `update-agent.sh`) |
+| `infra/cfn-template.yaml` | Admin | Full infrastructure definition |
 
 ## Project Structure
 
@@ -142,7 +194,7 @@ ai-qa-test-engine/
 │   ├── 07-stop-on-failure/
 │   └── 08-trajectory-replay/
 ├── infra/                       # CloudFormation template
-├── scripts/                     # deploy.sh, destroy.sh, test-cli.sh
+├── scripts/                     # deploy-infra.sh, update-agent.sh, destroy.sh, test-cli.sh
 └── pyproject.toml               # uv workspace
 ```
 
