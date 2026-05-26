@@ -379,3 +379,126 @@ my_functions/
 ```
 
 You can also set `CUSTOM_FUNCTIONS_FILE=./my_functions/` in `.env`.
+
+## Trajectory Replay (Speed Up Repeated Runs)
+
+On first run, the engine records browser actions (clicks, scrolls) as trajectory JSON files. On subsequent runs, cached action steps replay without calling the AI model — saving time and API costs.
+
+**How it works:**
+1. First run: Nova Act executes normally, trajectories saved to `trajectories/` dir
+2. Second run: Action steps replay from cache (no AI call), validation steps still use AI (they read page content)
+3. Cache key: based on the resolved instruction text — if variables change, cache misses automatically
+
+**CLI flags:**
+```bash
+# Normal run (cache enabled by default)
+ai-qa-test run --feature-dir ./features/
+
+# Disable cache (always use Nova Act)
+ai-qa-test run --feature-dir ./features/ --no-cache
+
+# Strict validation during replay (fail if page state differs)
+ai-qa-test run --feature-dir ./features/ --trajectory-strict
+```
+
+**Per-step control:** Add `@no-cache` to any step to skip replay for that step:
+```gherkin
+When I click the submit button @no-cache
+```
+
+**Requires:** `nova-act-samples` on PYTHONPATH for replay (falls back to Nova Act if not available).
+
+## Stop on Failure (Interactive Debugging)
+
+When a step fails, the browser stays open so you can inspect the page, edit the `.feature` file to fix the step, then press Enter to re-translate and resume.
+
+```bash
+ai-qa-test run --feature-dir ./features/ --stop-on-failure
+```
+
+**Flow:**
+1. Step fails → browser stays open, terminal shows error
+2. You edit the `.feature` file (fix the failing step)
+3. Press Enter in the terminal
+4. Engine re-translates the feature, detects the first changed step, resumes from there
+5. If the fix works, execution continues to the end
+
+**Note:** The browser state must be compatible with where you're resuming from. If you changed an earlier step, the page might not be in the right state.
+
+## @include (Reusable Step Sequences)
+
+Extract common step sequences into `.steps` files and include them in multiple features.
+
+**Create a `.steps` file:**
+```
+# common_steps/login_flow.steps
+Given I am on the login page
+When I enter "user@example.com" for username
+And I enter "password123" for password
+And I click the Sign In button
+```
+
+**Use in a feature:**
+```gherkin
+Scenario: View dashboard after login
+  And @include "login_flow"
+  Then I should see the dashboard
+```
+
+**CLI:**
+```bash
+ai-qa-test run --feature-dir ./features/ --common-steps-dir ./common_steps/
+```
+
+The `@include` directive is expanded before translation — the AI sees the full steps, not the include reference.
+
+## AgentCore Deployment (Parallel Execution at Scale)
+
+Deploy the engine to AWS AgentCore for parallel test execution with S3 I/O. No Docker or CLI tools needed locally — just AWS CLI.
+
+**Deploy:**
+```bash
+./scripts/deploy.sh                    # Creates everything (IAM, ECR, CodeBuild, runtimes)
+./scripts/deploy.sh --role-arn ARN     # Use pre-created role
+./scripts/deploy.sh --test-bucket X    # Use pre-created bucket
+```
+
+**Upload tests and run:**
+```bash
+# Upload your test suite to S3
+aws s3 sync ./my-tests/ s3://<bucket>/my-project/tests/
+
+# Invoke orchestrator (runs all scenarios in parallel)
+PAYLOAD=$(echo '{"input_bucket":"<bucket>","input_prefix":"my-project/tests/","output_bucket":"<bucket>","output_prefix":"my-project/results","test_runner_arn":"<runner-arn>","max_concurrency":10}' | base64)
+aws bedrock-agentcore invoke-agent-runtime \
+  --agent-runtime-arn <orchestrator-arn> \
+  --payload "$PAYLOAD" \
+  --cli-read-timeout 300 \
+  --region us-east-1 /tmp/result.json
+```
+
+**S3 input structure:**
+```
+my-project/tests/
+├── features/              ← .feature files
+├── tag-url-mapping.json   ← URL mappings
+├── custom-functions/      ← (optional) Python functions
+│   └── custom_functions.py
+└── translated/            ← (auto-managed) translation cache
+```
+
+**Results:**
+```
+my-project/results/run-20260526-123456/
+├── summary.json           ← pass/fail counts, durations
+├── combined-report.html   ← dashboard with all scenarios
+└── scenarios/
+    └── <scenario_id>/
+        ├── result.json    ← step-level details + extracted variables
+        └── report.html    ← individual scenario report
+```
+
+**Teardown:**
+```bash
+./scripts/destroy.sh       # Removes all AWS resources
+```
