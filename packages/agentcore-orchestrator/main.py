@@ -190,7 +190,14 @@ def handler(payload):
 
 
 def _check_cache(bucket, features_prefix, translated_prefix, force_retranslate, list_objects, get_last_modified):
-    """Check which features need (re)translation."""
+    """Check which features need (re)translation.
+
+    Two-level cache:
+    1. Fast: timestamp comparison (translated newer than feature → skip)
+    2. Hash fallback: if timestamps say stale, compare content hash (handles re-uploads)
+    """
+    import hashlib
+
     feature_files = list_objects(bucket, features_prefix, suffix=".feature")
     logger.info(f"Found {len(feature_files)} .feature files")
 
@@ -200,25 +207,85 @@ def _check_cache(bucket, features_prefix, translated_prefix, force_retranslate, 
         feature_name = os.path.basename(feature_key).replace(".feature", "")
         cached_json_key = f"{translated_prefix}{feature_name}.json"
 
-        needs_translation = force_retranslate
-        if not needs_translation:
-            cached_modified = get_last_modified(bucket, cached_json_key)
-            if cached_modified is None or cached_modified < feat["last_modified"]:
-                needs_translation = True
+        if force_retranslate:
+            cache_status[feature_key] = {
+                "needs_translation": True,
+                "cached_json_key": cached_json_key,
+                "feature_name": feature_name,
+            }
+            continue
 
-        cache_status[feature_key] = {
-            "needs_translation": needs_translation,
-            "cached_json_key": cached_json_key,
-            "feature_name": feature_name,
-        }
+        # Level 1: Timestamp check (fast — HEAD request only)
+        cached_modified = get_last_modified(bucket, cached_json_key)
+        if cached_modified is None:
+            # No cached translation exists
+            cache_status[feature_key] = {
+                "needs_translation": True,
+                "cached_json_key": cached_json_key,
+                "feature_name": feature_name,
+            }
+        elif cached_modified >= feat["last_modified"]:
+            # Translated is newer — cache hit
+            cache_status[feature_key] = {
+                "needs_translation": False,
+                "cached_json_key": cached_json_key,
+                "feature_name": feature_name,
+            }
+        else:
+            # Timestamp says stale — Level 2: content hash check
+            # (handles re-uploads where content hasn't actually changed)
+            needs = _check_content_hash(bucket, feature_key, cached_json_key)
+            cache_status[feature_key] = {
+                "needs_translation": needs,
+                "cached_json_key": cached_json_key,
+                "feature_name": feature_name,
+            }
+            if not needs:
+                logger.info(f"  {feature_name}: timestamp stale but content unchanged (skip)")
 
     stale = sum(1 for v in cache_status.values() if v["needs_translation"])
     logger.info(f"Cache: {stale} need translation, {len(cache_status) - stale} cached")
     return cache_status
 
 
+def _check_content_hash(bucket, feature_key, cached_json_key):
+    """Compare content hash of .feature file against stored hash in translated JSON.
+
+    Returns True if translation is needed, False if content is unchanged.
+    """
+    import hashlib
+    import json
+    import boto3
+
+    s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+
+    try:
+        # Download feature content and compute hash
+        feature_resp = s3.get_object(Bucket=bucket, Key=feature_key)
+        feature_content = feature_resp["Body"].read().decode("utf-8")
+        # Normalize: strip whitespace/newlines for comparison
+        normalized = "".join(feature_content.split())
+        current_hash = hashlib.sha256(normalized.encode()).hexdigest()[:16]
+
+        # Check if translated JSON has a stored hash
+        json_resp = s3.get_object(Bucket=bucket, Key=cached_json_key)
+        json_content = json_resp["Body"].read().decode("utf-8")
+        translated = json.loads(json_content)
+        stored_hash = translated.get("_source_hash", "")
+
+        if stored_hash and stored_hash == current_hash:
+            return False  # Content unchanged, no translation needed
+
+        return True  # Hash mismatch or no stored hash — needs translation
+
+    except Exception as e:
+        logger.warning(f"Hash check failed for {feature_key}: {e}")
+        return True  # On error, assume translation needed
+
+
 def _translate_stale(bucket, cache_status, tag_url_map, translated_prefix, test_runner_arn, bedrock_model_id, download_string, upload_string):
     """Translate stale features by calling Test Runner's translate action."""
+    import hashlib
     from invoker import _invoke_runtime
 
     stale = {k: v for k, v in cache_status.items() if v["needs_translation"]}
@@ -233,6 +300,10 @@ def _translate_stale(bucket, cache_status, tag_url_map, translated_prefix, test_
         logger.info(f"Translating: {feature_name}...")
         feature_content = download_string(bucket, feature_key)
 
+        # Compute content hash for future cache checks
+        normalized = "".join(feature_content.split())
+        source_hash = hashlib.sha256(normalized.encode()).hexdigest()[:16]
+
         translate_payload = {
             "action": "translate",
             "feature_content": feature_content,
@@ -245,10 +316,14 @@ def _translate_stale(bucket, cache_status, tag_url_map, translated_prefix, test_
         result = _invoke_runtime(test_runner_arn, translate_payload)
 
         if result.get("status") == "SUCCESS" and "translated" in result:
-            translated_json = json.dumps(result["translated"], indent=2)
+            # Store source hash in translated JSON for future cache validation
+            translated_data = result["translated"]
+            translated_data["_source_hash"] = source_hash
+
+            translated_json = json.dumps(translated_data, indent=2)
             upload_string(translated_json, bucket, cached_json_key)
-            scenarios_count = len(result["translated"].get("scenarios", []))
-            logger.info(f"  ✓ Cached: {feature_name} ({scenarios_count} scenarios)")
+            scenarios_count = len(translated_data.get("scenarios", []))
+            logger.info(f"  ✓ Cached: {feature_name} ({scenarios_count} scenarios, hash={source_hash})")
         else:
             logger.error(f"  ✗ Translation failed: {result.get('errors', [])}")
 
