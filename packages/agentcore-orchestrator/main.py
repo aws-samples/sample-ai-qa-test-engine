@@ -278,14 +278,17 @@ def _decompose(features, run_id, custom_functions_s3, output_bucket, output_pref
 
         for idx, scenario in enumerate(feature_data.get("scenarios", [])):
             scenario_name = scenario.get("name", f"scenario_{idx}")
-            safe_scenario = re.sub(r"[^\w\s-]", "", scenario_name)
-            safe_scenario = re.sub(r"[-\s]+", "_", safe_scenario).lower()
+            tags = scenario.get("tags", [])
+
+            # Generate canonical scenario ID
+            scenario_id = _make_scenario_id(feature_name, scenario_name, tags)
 
             payload = {
                 "scenario": scenario,
                 "base_url": base_url,
                 "feature_name": feature_name,
-                "scenario_name": safe_scenario,
+                "scenario_name": scenario_name,
+                "scenario_id": scenario_id,
                 "run_id": run_id,
             }
 
@@ -294,13 +297,33 @@ def _decompose(features, run_id, custom_functions_s3, output_bucket, output_pref
 
             payload["output_s3"] = {
                 "bucket": output_bucket,
-                "prefix": f"{output_prefix}/{run_id}/scenarios/{feature_name}_{safe_scenario}",
+                "prefix": f"{output_prefix}/{run_id}/scenarios/{scenario_id}",
             }
 
             payloads.append(payload)
 
     logger.info(f"Decomposed {len(features)} features into {len(payloads)} scenarios")
     return payloads
+
+
+def _make_scenario_id(feature_name, scenario_name, tags=None):
+    """Generate canonical scenario ID (same logic as core scenario_id module)."""
+    import re
+    # Check for @id:XXX tag
+    if tags:
+        for tag in tags:
+            tag_clean = tag.lstrip("@")
+            if tag_clean.startswith("id:") or tag_clean.startswith("id="):
+                val = tag_clean[3:]
+                return re.sub(r"[^\w]+", "_", val).strip("_").lower()
+
+    # Fallback: feature__scenario slug
+    def slugify(text, max_len=0):
+        s = re.sub(r"[^\w]+", "_", text).strip("_").lower()
+        return s[:max_len].rstrip("_") if max_len else s
+
+    parts = [slugify(feature_name, 30), slugify(scenario_name, 40)]
+    return "__".join(parts)
 
 
 if __name__ == "__main__":

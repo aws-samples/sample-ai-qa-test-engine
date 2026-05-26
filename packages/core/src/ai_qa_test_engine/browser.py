@@ -15,6 +15,7 @@ from nova_act import Workflow
 
 from ai_qa_test_engine.config import AppConfig
 from ai_qa_test_engine.nova_act_client import NovaActClient
+from ai_qa_test_engine.scenario_id import make_workflow_name as _make_wf_name
 
 
 # Lazy import to avoid requiring nova_act_qa at import time
@@ -27,14 +28,11 @@ def _get_nova_act_qa():
 def make_workflow_name(feature_name: str, scenario_name: str) -> str:
     """Generate a per-scenario workflow definition name.
 
-    API limit: 40 chars, pattern [a-zA-Z0-9_-].
-    Budget: "tt-" (3) + feature (18) + "-" (1) + scenario (18) = 40
-
-    Ported from test_translator/tests/test_runner.py.
+    Uses the canonical scenario_id module for consistent naming.
     """
-    feature_slug = re.sub(r"[^\w]+", "-", feature_name).strip("-").lower()
-    scenario_slug = re.sub(r"[^\w]+", "-", scenario_name).strip("-").lower()
-    return f"tt-{feature_slug[:18]}-{scenario_slug[:18]}"
+    from ai_qa_test_engine.scenario_id import make_scenario_id
+    sid = make_scenario_id(feature_name, scenario_name)
+    return _make_wf_name(sid)
 
 
 @contextmanager

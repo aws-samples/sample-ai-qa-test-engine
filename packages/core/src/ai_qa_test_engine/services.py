@@ -275,19 +275,40 @@ class TestExecutionService:
         return summary
 
     def _save_extracted_variables(self, result: ScenarioResult, feature_name: str) -> None:
-        """Save extracted variables to JSON file."""
+        """Save extracted variables to JSON file.
+
+        Structure: extracted_variables/{feature_filename}.json
+        Each file contains all scenarios from that feature with their IDs.
+        """
+        from ai_qa_test_engine.scenario_id import make_scenario_id, slugify
+
         output_dir = self.config.resolve_extracted_variables_dir()
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        safe_name = re.sub(r"[^\w\s-]", "", result.scenario_name)
-        safe_name = re.sub(r"[-\s]+", "_", safe_name).lower()
+        # File named after feature
+        feature_slug = slugify(feature_name)
+        filepath = output_dir / f"{feature_slug}.json"
 
-        filepath = output_dir / f"{safe_name}.json"
-        output_data = {
-            "feature": feature_name,
-            "scenario": result.scenario_name,
+        # Load existing data (append scenarios to same feature file)
+        existing = {}
+        if filepath.exists():
+            with open(filepath) as f:
+                existing = json.load(f)
+
+        # Generate scenario ID
+        scenario_id = make_scenario_id(feature_name, result.scenario_name)
+
+        # Add/update this scenario's variables
+        if "feature" not in existing:
+            existing["feature"] = feature_name
+        if "scenarios" not in existing:
+            existing["scenarios"] = {}
+
+        existing["scenarios"][scenario_id] = {
+            "scenario_name": result.scenario_name,
+            "scenario_id": scenario_id,
             "variables": result.extracted_variables,
         }
 
         with open(filepath, "w") as f:
-            json.dump(output_data, f, indent=2, default=str)
+            json.dump(existing, f, indent=2, default=str)
