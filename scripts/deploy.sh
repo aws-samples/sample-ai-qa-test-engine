@@ -61,6 +61,9 @@ aws s3 mb "s3://${DEPLOY_BUCKET}" --region "$REGION" 2>/dev/null || true
 
 cd "$PROJECT_ROOT/packages/agentcore-runner"
 zip -r /tmp/agentcore-runner.zip main.py scenario_executor.py s3_utils.py pyproject.toml -x '*.pyc' --quiet
+# Include core engine package so container can pip install it
+cd "$PROJECT_ROOT/packages/core"
+zip -r /tmp/agentcore-runner.zip src/ pyproject.toml -x '*.pyc' '*__pycache__*' --quiet
 aws s3 cp /tmp/agentcore-runner.zip "s3://${DEPLOY_BUCKET}/source/agentcore-runner.zip" --quiet
 
 cd "$PROJECT_ROOT/packages/agentcore-orchestrator"
