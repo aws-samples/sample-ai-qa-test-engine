@@ -86,8 +86,8 @@ echo ""
 # ============================================================
 echo "📝 Translation"
 check_output "translate produces JSON" "Translation complete" .venv/bin/ai-qa-test translate \
-    --feature-dir ./sample-tests/feature-01-core-execution/features/ \
-    --tag-url-map-file ./sample-tests/feature-01-core-execution/tag-url-mapping.json
+    --feature-dir ./examples/01-basic-navigation/ \
+    --tag-url-map-file ./examples/01-basic-navigation/tag-url-mapping.json
 
 # Verify JSON files actually exist
 check_file_exists "basic_navigation.json created" "translated/basic_navigation.json"
@@ -110,27 +110,27 @@ echo ""
 echo "💾 Translation cache"
 # Cache hit — no re-translation
 check_output "cache hit (no re-translate)" "All features are cached" .venv/bin/ai-qa-test translate \
-    --feature-dir ./sample-tests/feature-01-core-execution/features/ \
-    --tag-url-map-file ./sample-tests/feature-01-core-execution/tag-url-mapping.json
+    --feature-dir ./examples/01-basic-navigation/ \
+    --tag-url-map-file ./examples/01-basic-navigation/tag-url-mapping.json
 
 # Verify "Translating" does NOT appear (proves no Bedrock call)
 check_not_output "no Bedrock call on cache hit" "Translating basic_navigation" .venv/bin/ai-qa-test translate \
-    --feature-dir ./sample-tests/feature-01-core-execution/features/ \
-    --tag-url-map-file ./sample-tests/feature-01-core-execution/tag-url-mapping.json
+    --feature-dir ./examples/01-basic-navigation/ \
+    --tag-url-map-file ./examples/01-basic-navigation/tag-url-mapping.json
 
 # Cache invalidation — modify file, verify re-translation triggered
-cp sample-tests/feature-01-core-execution/features/basic_navigation.feature /tmp/basic_nav_backup.feature
-echo "# cache invalidation test" >> sample-tests/feature-01-core-execution/features/basic_navigation.feature
+cp examples/01-basic-navigation/basic_navigation.feature /tmp/basic_nav_backup.feature
+echo "# cache invalidation test" >> examples/01-basic-navigation/basic_navigation.feature
 check_output "cache invalidation triggers re-translate" "Translating" .venv/bin/ai-qa-test translate \
-    --feature-dir ./sample-tests/feature-01-core-execution/features/basic_navigation.feature \
-    --tag-url-map-file ./sample-tests/feature-01-core-execution/tag-url-mapping.json
+    --feature-dir ./examples/01-basic-navigation/basic_navigation.feature \
+    --tag-url-map-file ./examples/01-basic-navigation/tag-url-mapping.json
 # Restore original
-cp /tmp/basic_nav_backup.feature sample-tests/feature-01-core-execution/features/basic_navigation.feature
+cp /tmp/basic_nav_backup.feature examples/01-basic-navigation/basic_navigation.feature
 rm /tmp/basic_nav_backup.feature
 # Re-cache the original
 .venv/bin/ai-qa-test translate \
-    --feature-dir ./sample-tests/feature-01-core-execution/features/basic_navigation.feature \
-    --tag-url-map-file ./sample-tests/feature-01-core-execution/tag-url-mapping.json > /dev/null 2>&1
+    --feature-dir ./examples/01-basic-navigation/basic_navigation.feature \
+    --tag-url-map-file ./examples/01-basic-navigation/tag-url-mapping.json > /dev/null 2>&1
 echo ""
 
 # ============================================================
@@ -138,9 +138,9 @@ echo ""
 # ============================================================
 echo "🔍 Validate command"
 check_output "validate passes with valid features" "All validations passed" .venv/bin/ai-qa-test validate \
-    --feature-dir ./sample-tests/feature-01-core-execution/features/ \
-    --functions-file ./sample-tests/feature-01-core-execution/custom_functions.py \
-    --tag-url-map-file ./sample-tests/feature-01-core-execution/tag-url-mapping.json
+    --feature-dir ./examples/01-basic-navigation/ \
+    --functions-file ./examples/03-custom-functions/custom_functions.py \
+    --tag-url-map-file ./examples/01-basic-navigation/tag-url-mapping.json
 echo ""
 
 # ============================================================
@@ -171,14 +171,14 @@ echo "📊 Excel reader"
 check_output "read row 1" "Proxima Centauri b" .venv/bin/python -c "
 from ai_qa_test_engine.excel_reader import read_excel_data
 from pathlib import Path
-data = read_excel_data(Path('sample-tests/feature-02-excel-secrets/TestData.xlsx'), 'Destinations', row=1)
+data = read_excel_data(Path('examples/05-excel-secrets/TestData.xlsx'), 'Destinations', row=1)
 print(data['destination'])
 "
 
 check_output "read row 2" "Ross 128 b" .venv/bin/python -c "
 from ai_qa_test_engine.excel_reader import read_excel_data
 from pathlib import Path
-data = read_excel_data(Path('sample-tests/feature-02-excel-secrets/TestData.xlsx'), 'Destinations', row=2)
+data = read_excel_data(Path('examples/05-excel-secrets/TestData.xlsx'), 'Destinations', row=2)
 print(data['destination'])
 "
 
@@ -197,7 +197,7 @@ check_output "wrong sheet raises error" "not found" .venv/bin/python -c "
 from ai_qa_test_engine.excel_reader import read_excel_data
 from pathlib import Path
 try:
-    read_excel_data(Path('sample-tests/feature-02-excel-secrets/TestData.xlsx'), 'BadSheet', row=1)
+    read_excel_data(Path('examples/05-excel-secrets/TestData.xlsx'), 'BadSheet', row=1)
 except ValueError as e:
     print(e)
 "
@@ -211,8 +211,8 @@ check_output "expands steps from .steps file" "I am on the home page" .venv/bin/
 from ai_qa_test_engine.parser import preprocess_feature_file
 from pathlib import Path
 content = preprocess_feature_file(
-    Path('sample-tests/feature-03-include-stopfail/features/include_steps.feature'),
-    Path('sample-tests/feature-03-include-stopfail/common_steps')
+    Path('examples/06-include-reuse/include_steps.feature'),
+    Path('examples/06-include-reuse/common_steps')
 )
 print(content)
 "
@@ -222,8 +222,8 @@ check_not_output "@include removed after expansion" "@include" .venv/bin/python 
 from ai_qa_test_engine.parser import preprocess_feature_file
 from pathlib import Path
 content = preprocess_feature_file(
-    Path('sample-tests/feature-03-include-stopfail/features/include_steps.feature'),
-    Path('sample-tests/feature-03-include-stopfail/common_steps')
+    Path('examples/06-include-reuse/include_steps.feature'),
+    Path('examples/06-include-reuse/common_steps')
 )
 print(content)
 "
@@ -233,7 +233,7 @@ check_output "missing .steps file raises error" "not found" .venv/bin/python -c 
 from ai_qa_test_engine.parser import resolve_includes
 try:
     from pathlib import Path
-    resolve_includes('And @include \"nonexistent_flow\"', Path('sample-tests/feature-03-include-stopfail/common_steps'))
+    resolve_includes('And @include \"nonexistent_flow\"', Path('examples/06-include-reuse/common_steps'))
 except FileNotFoundError as e:
     print(e)
 "
@@ -247,7 +247,7 @@ check_output "load user functions + call" "4200.0" .venv/bin/python -c "
 from ai_qa_test_engine.function_registry import FunctionRegistry
 from pathlib import Path
 reg = FunctionRegistry()
-reg.load_from_file(Path('sample-tests/feature-01-core-execution/custom_functions.py'))
+reg.load_from_file(Path('examples/03-custom-functions/custom_functions.py'))
 result = reg.call('calculate_travel_cost', {'base_price': 1000, 'distance_multiplier': 4.2})
 print(result)
 "
@@ -281,7 +281,7 @@ check_output "dict return auto-unpacks" "1.1g" .venv/bin/python -c "
 from ai_qa_test_engine.function_registry import FunctionRegistry
 from pathlib import Path
 reg = FunctionRegistry()
-reg.load_from_file(Path('sample-tests/feature-01-core-execution/custom_functions.py'))
+reg.load_from_file(Path('examples/03-custom-functions/custom_functions.py'))
 result = reg.call('get_destination_stats', {'destination': 'Proxima Centauri b'})
 assert isinstance(result, dict)
 assert result['gravity'] == '1.1g'
@@ -294,7 +294,7 @@ check_output "tuple return for positional unpack" "testuser@example.com" .venv/b
 from ai_qa_test_engine.function_registry import FunctionRegistry
 from pathlib import Path
 reg = FunctionRegistry()
-reg.load_from_file(Path('sample-tests/feature-01-core-execution/custom_functions.py'))
+reg.load_from_file(Path('examples/03-custom-functions/custom_functions.py'))
 result = reg.call('get_credentials', {'env': 'test'})
 assert isinstance(result, tuple)
 assert result[0] == 'testuser@example.com'
@@ -307,7 +307,7 @@ check_output "directory load + cross-file import" "2200.0" .venv/bin/python -c "
 from ai_qa_test_engine.function_registry import FunctionRegistry
 from pathlib import Path
 reg = FunctionRegistry()
-count = reg.load_from_directory(Path('sample-tests/feature-01-core-execution/functions_dir'))
+count = reg.load_from_directory(Path('examples/03-custom-functions/functions_dir'))
 assert count == 2
 result = reg.call('calculate_trip_total', {'base_price': 1000, 'passengers': 2})
 assert result['subtotal'] == 2000.0
@@ -370,7 +370,7 @@ print(c.enable_video_recording)
 check_output "tag-url-map from JSON file" "https://nova" .venv/bin/python -c "
 from pathlib import Path
 from ai_qa_test_engine.config import AppConfig
-c = AppConfig(feature_dir=Path('features'), tag_url_map_file=Path('sample-tests/feature-01-core-execution/tag-url-mapping.json'))
+c = AppConfig(feature_dir=Path('features'), tag_url_map_file=Path('examples/01-basic-navigation/tag-url-mapping.json'))
 mapping = c.get_tag_url_mapping()
 print(mapping.get('nextdotgym', ''))
 "
@@ -387,41 +387,41 @@ echo ""
 
 echo "🚀 Feature 01: Core execution (navigation, extraction, validation, functions, input_variables)"
 check "feature-01 core pass" .venv/bin/ai-qa-test run \
-    --feature-dir ./sample-tests/feature-01-core-execution/features/ \
-    --tag-url-map-file ./sample-tests/feature-01-core-execution/tag-url-mapping.json \
-    --functions-file ./sample-tests/feature-01-core-execution/custom_functions.py \
-    --functions-file ./sample-tests/feature-01-core-execution/functions_dir/ \
-    --variables-file ./sample-tests/feature-01-core-execution/input_vars.json \
+    --feature-dir ./examples/01-basic-navigation/ \
+    --tag-url-map-file ./examples/01-basic-navigation/tag-url-mapping.json \
+    --functions-file ./examples/03-custom-functions/custom_functions.py \
+    --functions-file ./examples/03-custom-functions/functions_dir/ \
+    --variables-file ./examples/04-data-driven/input_vars.json \
     --browser-mode headless
 echo ""
 
 echo "🚀 Feature 02: Excel data loading"
 check "feature-02 excel_data" .venv/bin/ai-qa-test run \
-    --feature-dir ./sample-tests/feature-02-excel-secrets/features/excel_data.feature \
-    --tag-url-map-file ./sample-tests/feature-02-excel-secrets/tag-url-mapping.json \
+    --feature-dir ./examples/05-excel-secrets/excel_data.feature \
+    --tag-url-map-file ./examples/05-excel-secrets/tag-url-mapping.json \
     --browser-mode headless
 echo ""
 
 echo "🚀 Feature 02: Screenshot + Claude extraction"
 check "feature-02 screenshot_extract" .venv/bin/ai-qa-test run \
-    --feature-dir ./sample-tests/feature-02-excel-secrets/features/screenshot_extract.feature \
-    --tag-url-map-file ./sample-tests/feature-02-excel-secrets/tag-url-mapping.json \
+    --feature-dir ./examples/05-excel-secrets/screenshot_extract.feature \
+    --tag-url-map-file ./examples/05-excel-secrets/tag-url-mapping.json \
     --browser-mode headless
 echo ""
 
 echo "🚀 Feature 02: Secure typing (enter_username via Playwright)"
 check "feature-02 secret_enter" env TEST_EMAIL=fakeuser@example.com .venv/bin/ai-qa-test run \
-    --feature-dir ./sample-tests/feature-02-excel-secrets/features/secret_enter.feature \
-    --tag-url-map-file ./sample-tests/feature-02-excel-secrets/tag-url-mapping.json \
+    --feature-dir ./examples/05-excel-secrets/secret_enter.feature \
+    --tag-url-map-file ./examples/05-excel-secrets/tag-url-mapping.json \
     --browser-mode headless \
     --force-translate
 echo ""
 
 echo "🚀 Feature 03: @include common steps"
 check "feature-03 include_steps" .venv/bin/ai-qa-test run \
-    --feature-dir ./sample-tests/feature-03-include-stopfail/features/include_steps.feature \
-    --tag-url-map-file ./sample-tests/feature-03-include-stopfail/tag-url-mapping.json \
-    --common-steps-dir ./sample-tests/feature-03-include-stopfail/common_steps \
+    --feature-dir ./examples/06-include-reuse/include_steps.feature \
+    --tag-url-map-file ./examples/06-include-reuse/tag-url-mapping.json \
+    --common-steps-dir ./examples/06-include-reuse/common_steps \
     --browser-mode headless \
     --force-translate
 echo ""
@@ -429,8 +429,8 @@ echo ""
 echo "🚀 Feature 03: Stop-on-failure (automated — fix file + Enter)"
 TEST_TMP="/tmp/test-stop-fail-$$"
 mkdir -p "$TEST_TMP/features"
-cp sample-tests/feature-03-include-stopfail/features/will_fail.feature "$TEST_TMP/features/"
-cp sample-tests/feature-03-include-stopfail/tag-url-mapping.json "$TEST_TMP/"
+cp examples/07-stop-on-failure/will_fail.feature "$TEST_TMP/features/"
+cp examples/06-include-reuse/tag-url-mapping.json "$TEST_TMP/"
 
 FIFO="$TEST_TMP/stdin_pipe"
 mkfifo "$FIFO"
@@ -489,7 +489,7 @@ Feature: Trajectory test
     When I click on the Destinations page
     Then I should see a list of destinations
 EOF
-cp sample-tests/feature-01-core-execution/tag-url-mapping.json "$TRAJ_TMP/"
+cp examples/01-basic-navigation/tag-url-mapping.json "$TRAJ_TMP/"
 cat > "$TRAJ_TMP/.env" << 'EOF'
 FEATURE_DIR=features
 BROWSER_MODE=headless

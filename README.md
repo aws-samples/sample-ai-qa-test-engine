@@ -9,11 +9,11 @@ AI-powered QA test execution engine using Nova Act browser automation. Translate
 uv sync
 
 # Run sample tests
-cd sample-tests/feature-01-core-execution/
-ai-qa-test run --feature-dir ./features/
+cd examples/01-basic-navigation/
+ai-qa-test run --feature-dir . --tag-url-map-file ./tag-url-mapping.json
 
 # Translate only (no execution)
-ai-qa-test translate --feature-dir ./features/
+ai-qa-test translate --feature-dir . --tag-url-map-file ./tag-url-mapping.json
 ```
 
 ### Windows
@@ -36,38 +36,38 @@ ai-qa-test run --feature-dir .\features\ --browser-mode headed
 
 | Feature | Description | Example |
 |---------|-------------|---------|
-| **Gherkin Execution** | Parse and execute .feature files with Nova Act | `Given I am on the home page` → browser navigates |
-| **Background Steps** | Shared steps prepended to every scenario | `Background:` block runs before each scenario |
-| **Scenario Outline** | Data-driven tests with Examples table | `Scenario Outline:` + `Examples:` expands to N scenarios |
-| **Data Tables** | Tabular data in steps | `\| field \| value \|` passed as step parameters |
-| **Variable Extraction** | Extract values from page, use in later steps | `store it as "order_id"` → `${order_id}` in next steps |
-| **Variable Substitution** | Reference extracted values with `${name}` | `Then I should see "${order_id}"` |
-| **Input Variables** | Pre-load variables from JSON file | `--variables-file vars.json` → `${name}` available in all steps |
-| **Output Variables** | Save extracted variables to JSON after scenario | Auto-saved to `extracted_variables/<scenario>.json` |
-| **Custom Functions** | Call Python functions from Gherkin steps | `I call 'calculate_tax' with amount 100 and store as 'tax'` |
-| **Multi-value Return (dict)** | Functions returning dict auto-unpack to `${key.field}` | `store as 'row'` → `${row.name}`, `${row.price}` |
-| **Multi-value Return (tuple)** | Comma-separated storage keys unpack tuple/list | `store as 'username, password'` → `${username}`, `${password}` |
-| **Reserved Params** | Functions can access browser and context | `nova_act` param = browser, `context` param = variables |
-| **Translation Caching** | Cache Gherkin→JSON translation (content-hash) | Second run skips translation, uses cached JSON |
-| **Tag-to-URL Mapping** | Map `@tags` to starting URLs | `@MyApp` → `https://myapp.com` via env or JSON file |
-| **Excel Data** | Load test data from .xlsx files | `I call 'load_excel_field' with file "data.xlsx" and sheet "Login"` |
-| **Secrets (env)** | Fetch secrets from .env for local dev | `I call 'get_secret' with secret_name "PASSWORD" and store as 'pw'` |
-| **Secrets (AWS SM)** | Fetch secrets from AWS Secrets Manager | Same as above — tries AWS SM first, falls back to .env |
-| **Secure Typing** | Type credentials via Playwright (not Nova Act) | `And I enter "user@example.com" for username` |
-| **Screenshot+Claude** | Extract data from screenshots using Claude | `I call 'extract_from_screenshot' with prompt "What is the order ID?"` |
-| **@include Steps** | Reuse common step sequences from .steps files | `And @include "login_flow"` expands steps inline |
-| **Stop on Failure** | Pause on failure, edit .feature, retry | `--stop-on-failure` keeps browser open, re-translates on Enter |
+| **Gherkin Execution** | Parse and execute .feature files with Nova Act | [`01-basic-navigation/`](examples/01-basic-navigation/) |
+| **Background Steps** | Shared steps prepended to every scenario | [`02-extraction-validation/`](examples/02-extraction-validation/) |
+| **Scenario Outline** | Data-driven tests with Examples table | [`04-data-driven/scenario_outline.feature`](examples/04-data-driven/scenario_outline.feature) |
+| **Data Tables** | Tabular data in steps | [`04-data-driven/data_tables.feature`](examples/04-data-driven/data_tables.feature) |
+| **Variable Extraction** | Extract values from page, use in later steps | [`02-extraction-validation/extraction.feature`](examples/02-extraction-validation/extraction.feature) |
+| **Variable Substitution** | Reference extracted values with `${name}` | [`02-extraction-validation/extraction.feature`](examples/02-extraction-validation/extraction.feature) |
+| **Input Variables** | Pre-load variables from JSON file | [`04-data-driven/input_variables.feature`](examples/04-data-driven/input_variables.feature) |
+| **Output Variables** | Save extracted variables to JSON after scenario | [`02-extraction-validation/`](examples/02-extraction-validation/) |
+| **Custom Functions** | Call Python functions from Gherkin steps | [`03-custom-functions/functions.feature`](examples/03-custom-functions/functions.feature) |
+| **Multi-value Return (dict)** | Functions returning dict auto-unpack to `${key.field}` | [`03-custom-functions/multi_value.feature`](examples/03-custom-functions/multi_value.feature) |
+| **Multi-value Return (tuple)** | Comma-separated storage keys unpack tuple/list | [`03-custom-functions/multi_value.feature`](examples/03-custom-functions/multi_value.feature) |
+| **Reserved Params** | Functions can access browser and context | [`03-custom-functions/custom_functions.py`](examples/03-custom-functions/custom_functions.py) |
+| **Translation Caching** | Cache Gherkin→JSON translation (content-hash) | All examples (automatic) |
+| **Tag-to-URL Mapping** | Map `@tags` to starting URLs | [`01-basic-navigation/tag-url-mapping.json`](examples/01-basic-navigation/tag-url-mapping.json) |
+| **Excel Data** | Load test data from .xlsx files | [`05-excel-secrets/excel_data.feature`](examples/05-excel-secrets/excel_data.feature) |
+| **Secrets (env)** | Fetch secrets from .env for local dev | [`05-excel-secrets/secrets.feature`](examples/05-excel-secrets/secrets.feature) |
+| **Secrets (AWS SM)** | Fetch secrets from AWS Secrets Manager | [`05-excel-secrets/secrets.feature`](examples/05-excel-secrets/secrets.feature) |
+| **Secure Typing** | Type credentials via Playwright (not Nova Act) | [`05-excel-secrets/secrets.feature`](examples/05-excel-secrets/secrets.feature) |
+| **Screenshot+Claude** | Extract data from screenshots using Claude | [`05-excel-secrets/screenshot_extract.feature`](examples/05-excel-secrets/screenshot_extract.feature) |
+| **@include Steps** | Reuse common step sequences from .steps files | [`06-include-reuse/`](examples/06-include-reuse/) |
+| **Stop on Failure** | Pause on failure, edit .feature, retry | [`07-stop-on-failure/`](examples/07-stop-on-failure/) |
 | **Browser Modes** | Headed, headless, or AgentCore (remote) | `--browser-mode headed` / `headless` |
 | **HTML Reports** | Rich dashboard with step details + screenshots | Auto-generated at `reports/report.html` |
 | **CLI** | Command-line interface for all operations | `ai-qa-test run --feature-dir ./features/` |
 | **Validate Command** | Check variables + functions without running browser | `ai-qa-test validate --feature-dir ./features/` |
 | **Video Recording** | Record browser session video | `--video` flag or `ENABLE_VIDEO_RECORDING=true` |
 | **Force Re-translate** | Bypass cache and re-translate all features | `--force-translate` |
-| **Trajectory Replay** | Cache browser trajectories, replay without AI model calls | Second run auto-replays; `--no-cache` to bypass |
-| **@no-cache Annotation** | Skip trajectory cache for specific steps | `When I click submit @no-cache` always uses Nova Act |
-| **@id Tag** | Assign explicit scenario IDs for stable naming | `@id:TC-001` → used in workflow names, S3 paths, reports |
+| **Trajectory Replay** | Cache browser trajectories, replay without AI model calls | [`08-trajectory-replay/`](examples/08-trajectory-replay/) |
+| **@no-cache Annotation** | Skip trajectory cache for specific steps | [`08-trajectory-replay/trajectory.feature`](examples/08-trajectory-replay/trajectory.feature) |
+| **@id Tag** | Assign explicit scenario IDs for stable naming | [`02-extraction-validation/extraction.feature`](examples/02-extraction-validation/extraction.feature) |
 | **Trajectory Strict** | Validate URL/screenshot/DOM during replay | `--trajectory-strict` fails on page state mismatch |
-| **AgentCore Deploy** | Parallel execution at scale with S3 I/O | `./scripts/deploy.sh` — Orchestrator + N Test Runners |
+| **AgentCore Deploy** | Parallel execution at scale with S3 I/O | `./scripts/deploy.sh` |
 | **Screenshot on Fail** | Auto-captures screenshot when a step fails | Embedded in HTML report |
 
 ### Planned (not yet implemented)
@@ -128,10 +128,22 @@ aws bedrock-agentcore invoke-agent-runtime \
 ```
 ai-qa-test-engine/
 ├── packages/
-│   ├── core/          # Execution engine, translation, caching, reporting
-│   └── cli/           # Command-line interface
-├── sample-tests/      # Sample test suites per feature
-└── pyproject.toml     # uv workspace
+│   ├── core/                    # Execution engine, translation, caching, reporting
+│   ├── cli/                     # Command-line interface
+│   ├── agentcore-runner/        # AgentCore Test Runner agent
+│   └── agentcore-orchestrator/  # AgentCore Orchestrator agent
+├── examples/                    # Syntax reference + runnable examples
+│   ├── 01-basic-navigation/
+│   ├── 02-extraction-validation/
+│   ├── 03-custom-functions/
+│   ├── 04-data-driven/
+│   ├── 05-excel-secrets/
+│   ├── 06-include-reuse/
+│   ├── 07-stop-on-failure/
+│   └── 08-trajectory-replay/
+├── infra/                       # CloudFormation template
+├── scripts/                     # deploy.sh, destroy.sh, test-cli.sh
+└── pyproject.toml               # uv workspace
 ```
 
 ## CLI Commands
