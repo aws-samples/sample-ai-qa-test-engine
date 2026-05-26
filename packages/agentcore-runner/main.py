@@ -143,7 +143,6 @@ def _handle_execute(payload):
     """Execute a single test scenario using ai-qa-test-engine with AgentCore browser."""
     from s3_utils import download_file, upload_string
     from scenario_executor import execute_scenario_agentcore
-    from ai_qa_test_engine.reporter import generate_scenario_html
 
     logger.info("Action: EXECUTE")
 
@@ -201,7 +200,7 @@ def _handle_execute(payload):
         result["result_s3_key"] = result_key
 
         # Generate and upload HTML report
-        html_report = generate_scenario_html(result, feature_name)
+        html_report = f"<html><body><h1>{feature_name}</h1><pre>{json.dumps(result, indent=2, default=str)}</pre></body></html>"
         report_key = f"{output_prefix}/report.html"
         upload_string(html_report, output_bucket, report_key, content_type="text/html; charset=utf-8")
         result["report_s3_key"] = report_key
