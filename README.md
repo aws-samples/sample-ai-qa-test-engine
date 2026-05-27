@@ -274,6 +274,39 @@ Example: `extraction__data_extraction__extract_and_verify_destination_name`
 }
 ```
 
+## Tag Filtering (Run Specific Scenarios)
+
+Filter which scenarios to execute using Gherkin tags:
+
+```bash
+# Run only @smoke scenarios
+ai-qa-test run --feature-dir ./examples/02-extraction-validation/ --tags "@smoke"
+
+# Run by scenario ID
+ai-qa-test run --feature-dir ./examples/02-extraction-validation/ --tags "@id:TC-EXT-001"
+
+# Exclude slow tests
+ai-qa-test run --feature-dir ./features/ --tags "not @slow"
+
+# Combine with AND/OR
+ai-qa-test run --feature-dir ./features/ --tags "@smoke and @login"
+ai-qa-test run --feature-dir ./features/ --tags "@smoke or @regression"
+```
+
+Tag your scenarios in Gherkin:
+```gherkin
+@smoke @id:TC-NAV-001
+Scenario: Navigate to destinations page
+  Given I am on the home page
+  ...
+
+@regression @id:TC-EXT-002
+Scenario: Extract multiple values
+  ...
+```
+
+Also works in AgentCore mode — add `"tag_filter": "@smoke"` to the orchestrator payload.
+
 ## Writing Tests
 
 ```gherkin
