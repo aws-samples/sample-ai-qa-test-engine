@@ -208,8 +208,20 @@ class TestExecutionService:
         log("\n🚀 Step 4: Executing scenarios")
         all_results: list[ScenarioResult] = []
 
+        # Apply tag filter if specified
+        tag_filter = self.config.tag_filter
+        if tag_filter:
+            from ai_qa_test_engine.tag_filter import matches_tag_filter
+            log(f"  Tag filter: {tag_filter}")
+
         for feature_name, feature in features:
             for scenario in feature.scenarios:
+                # Skip scenarios that don't match tag filter
+                if tag_filter:
+                    if not matches_tag_filter(scenario.tags, tag_filter):
+                        log(f"  ⊘ Skipped (tag filter): {scenario.name}")
+                        continue
+
                 result = execute_scenario(
                     scenario=scenario,
                     base_url=feature.base_url,

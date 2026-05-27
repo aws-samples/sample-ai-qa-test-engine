@@ -30,6 +30,7 @@ def cli():
 @click.option("--video", is_flag=True, default=False, help="Enable video recording of browser session")
 @click.option("--no-cache", is_flag=True, default=False, help="Disable trajectory replay cache (always use Nova Act)")
 @click.option("--trajectory-strict", is_flag=True, default=False, help="Strict trajectory validation (fail on mismatch)")
+@click.option("--tags", type=str, default=None, help="Filter scenarios by tag (e.g., '@smoke', 'not @slow', '@id:TC-001')")
 @click.option("--tag", multiple=True, help="Tag-to-URL mapping (key=url)")
 @click.option("--functions-file", multiple=True, type=click.Path(exists=True, path_type=Path), help="Custom functions file or directory (can specify multiple)")
 @click.option("--env-file", type=click.Path(exists=True, path_type=Path), default=None, help="Path to .env file")
@@ -46,6 +47,7 @@ def run(
     video,
     no_cache,
     trajectory_strict,
+    tags,
     tag,
     functions_file,
     env_file,
@@ -89,6 +91,8 @@ def run(
         config_kwargs["no_cache"] = True
     if trajectory_strict:
         config_kwargs["trajectory_strict"] = True
+    if tags:
+        config_kwargs["tag_filter"] = tags
     if functions_file:
         # First path goes into config (used by service for primary loading)
         config_kwargs["custom_functions_file"] = functions_file[0]

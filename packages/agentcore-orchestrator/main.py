@@ -69,6 +69,7 @@ def handler(payload):
         max_concurrency = payload.get("max_concurrency", 10)
         force_retranslate = payload.get("force_retranslate", False)
         bedrock_model_id = payload.get("bedrock_model_id")
+        tag_filter = payload.get("tag_filter")  # e.g., "@smoke", "not @slow", "@id:TC-001"
 
         if not input_bucket:
             raise ValueError("Missing 'input_bucket' in payload")
@@ -126,7 +127,7 @@ def handler(payload):
         except Exception:
             pass
 
-        scenarios = _decompose(features, run_id, custom_functions_s3, output_bucket, output_prefix)
+        scenarios = _decompose(features, run_id, custom_functions_s3, output_bucket, output_prefix, tag_filter)
         logger.info(f"Total scenarios to execute: {len(scenarios)}")
 
         # Step 5: Fan out parallel invocations
@@ -342,7 +343,7 @@ def _load_translated(bucket, cache_status, download_string):
     return features
 
 
-def _decompose(features, run_id, custom_functions_s3, output_bucket, output_prefix):
+def _decompose(features, run_id, custom_functions_s3, output_bucket, output_prefix, tag_filter=None):
     """Break features into individual scenario payloads."""
     import re
     payloads = []
@@ -354,6 +355,11 @@ def _decompose(features, run_id, custom_functions_s3, output_bucket, output_pref
         for idx, scenario in enumerate(feature_data.get("scenarios", [])):
             scenario_name = scenario.get("name", f"scenario_{idx}")
             tags = scenario.get("tags", [])
+
+            # Apply tag filter
+            if tag_filter:
+                if not _matches_tag_filter(tags, tag_filter):
+                    continue
 
             # Generate canonical scenario ID
             scenario_id = _make_scenario_id(feature_name, scenario_name, tags)
@@ -399,6 +405,40 @@ def _make_scenario_id(feature_name, scenario_name, tags=None):
 
     parts = [slugify(feature_name, 30), slugify(scenario_name, 40)]
     return "__".join(parts)
+
+
+def _matches_tag_filter(tags, filter_expr):
+    """Check if scenario tags match a filter expression."""
+    import re
+    if not filter_expr:
+        return True
+    expr = filter_expr.strip()
+    normalized = [t.lower().lstrip("@") for t in tags]
+
+    if expr.lower().startswith("not "):
+        tag = expr[4:].strip().lower().lstrip("@")
+        return tag not in normalized
+
+    if " and " in expr.lower():
+        parts = re.split(r"\s+and\s+", expr, flags=re.IGNORECASE)
+        return all(_tag_match(normalized, p.strip()) for p in parts)
+
+    if " or " in expr.lower():
+        parts = re.split(r"\s+or\s+", expr, flags=re.IGNORECASE)
+        return any(_tag_match(normalized, p.strip()) for p in parts)
+
+    return _tag_match(normalized, expr)
+
+
+def _tag_match(normalized_tags, tag_expr):
+    """Single tag match."""
+    tag = tag_expr.lower().lstrip("@")
+    if tag in normalized_tags:
+        return True
+    for t in normalized_tags:
+        if t == f"id:{tag}":
+            return True
+    return False
 
 
 if __name__ == "__main__":

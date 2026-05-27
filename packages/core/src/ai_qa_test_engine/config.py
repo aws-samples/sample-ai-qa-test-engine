@@ -196,6 +196,12 @@ class AppConfig(BaseSettings):
         description="Disable trajectory replay cache (always use Nova Act)",
     )
 
+    tag_filter: str | None = Field(
+        default=None,
+        alias="TAG_FILTER",
+        description="Filter scenarios by tag expression (e.g., '@smoke', 'not @slow')",
+    )
+
     trajectory_strict: bool = Field(
         default=False,
         alias="TRAJECTORY_STRICT",
