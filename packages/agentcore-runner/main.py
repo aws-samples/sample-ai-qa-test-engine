@@ -71,10 +71,20 @@ def handler(payload):
         # Route by action
         action = payload.get("action", "execute")
 
-        if action == "translate":
-            return _handle_translate(payload)
-        else:
-            return _handle_execute(payload)
+        # Phase 1: signal HealthyBusy to the platform so the idle timeout
+        # doesn't kill the session during long-running handlers (sleeps,
+        # browser automation, custom functions). The handler still blocks
+        # synchronously - this only changes /ping status.
+        task_id = app.add_async_task(f"handler_{action}")
+        logger.info(f"BUSY: marked task busy, action={action}, task_id={task_id}")
+        try:
+            if action == "translate":
+                return _handle_translate(payload)
+            else:
+                return _handle_execute(payload)
+        finally:
+            app.complete_async_task(task_id)
+            logger.info(f"DONE: marked task complete, task_id={task_id}")
 
     except Exception as e:
         logger.error(f"Handler failed: {e}")

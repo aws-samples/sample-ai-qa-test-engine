@@ -45,6 +45,12 @@ def handler(payload):
 
     start_time = time.time()
 
+    # Phase 1: signal HealthyBusy to the platform so the idle timeout
+    # doesn't kill the session while we wait for runner invocations.
+    # Sync handler — only changes /ping status.
+    task_id = app.add_async_task("orchestrator_handler")
+    logger.info(f"BUSY: marked orchestrator task busy, task_id={task_id}")
+
     try:
         # Parse payload
         if isinstance(payload, str):
@@ -188,6 +194,9 @@ def handler(payload):
             "errors": [str(e)],
             "total_duration_seconds": time.time() - start_time,
         }
+    finally:
+        app.complete_async_task(task_id)
+        logger.info(f"DONE: marked orchestrator task complete, task_id={task_id}")
 
 
 def _check_cache(bucket, features_prefix, translated_prefix, force_retranslate, list_objects, get_last_modified):
