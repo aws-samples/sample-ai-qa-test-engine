@@ -71,7 +71,7 @@ def handler(payload):
         input_prefix = payload.get("input_prefix", "").rstrip("/") + "/"
         output_bucket = payload.get("output_bucket")
         output_prefix = payload.get("output_prefix", "").rstrip("/")
-        test_runner_arn = payload.get("test_runner_arn")
+        test_runner_arn = payload.get("test_runner_arn") or os.environ.get("TEST_RUNNER_ARN")
         max_concurrency = payload.get("max_concurrency", 10)
         force_retranslate = payload.get("force_retranslate", False)
         bedrock_model_id = payload.get("bedrock_model_id")
