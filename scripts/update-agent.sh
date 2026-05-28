@@ -186,9 +186,10 @@ for o in outputs:
         break
 ")
         RUNNER_ID=$(echo "$RUNNER_ARN" | sed 's|.*/||')
-        aws bedrock-agentcore update-agent-runtime \
+        aws bedrock-agentcore-control update-agent-runtime \
             --agent-runtime-id "$RUNNER_ID" \
             --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"${RUNNER_ECR}:latest\"}}" \
+            --network-configuration '{"networkMode":"PUBLIC"}' \
             --role-arn "$ROLE_ARN" \
             --region "$REGION" \
             --output text --query 'agentRuntimeArn' > /dev/null
@@ -213,9 +214,10 @@ for o in outputs:
         break
 ")
         ORCHESTRATOR_ID=$(echo "$ORCHESTRATOR_ARN" | sed 's|.*/||')
-        aws bedrock-agentcore update-agent-runtime \
+        aws bedrock-agentcore-control update-agent-runtime \
             --agent-runtime-id "$ORCHESTRATOR_ID" \
             --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"${ORCHESTRATOR_ECR}:latest\"}}" \
+            --network-configuration '{"networkMode":"PUBLIC"}' \
             --role-arn "$ROLE_ARN" \
             --region "$REGION" \
             --output text --query 'agentRuntimeArn' > /dev/null
