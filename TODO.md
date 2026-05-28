@@ -5,6 +5,8 @@
 - [ ] Add `--work-dir` flag to set base directory for all output (translated, trajectories, reports, recordings, extracted_variables)
 - [ ] Unify `CACHE_DIR` and `TRANSLATED_FEATURE_DIR` config (they're redundant)
 - [ ] Document `--feature-dir` accepts both a directory and a single file in README
+- [ ] Support feature-level tags in `--tags` filter (currently only matches scenario-level tags)
+- [ ] PII masking in execution logs (mask secrets, passwords, emails in log output)
 
 ## Execution
 - [ ] Per-scenario input variables (different vars per scenario via JSON keyed by scenario_id)
