@@ -54,7 +54,7 @@ ai-qa-test run --feature-dir .\features\ --browser-mode headed
 | **Secrets (env)** | Fetch secrets from .env for local dev | [`05-excel-secrets/secrets.feature`](examples/05-excel-secrets/secrets.feature) |
 | **Secrets (AWS SM)** | Fetch secrets from AWS Secrets Manager | [`05-excel-secrets/secrets.feature`](examples/05-excel-secrets/secrets.feature) |
 | **Secure Typing** | Type credentials via Playwright (not Nova Act) | [`05-excel-secrets/secrets.feature`](examples/05-excel-secrets/secrets.feature) |
-| **Screenshot+Claude** | Extract data from screenshots using Claude | [`05-excel-secrets/screenshot_extract.feature`](examples/05-excel-secrets/screenshot_extract.feature) |
+| **Screenshot Extraction** | Extract data from screenshots using AI vision | [`05-excel-secrets/screenshot_extract.feature`](examples/05-excel-secrets/screenshot_extract.feature) |
 | **@include Steps** | Reuse common step sequences from .steps files | [`06-include-reuse/`](examples/06-include-reuse/) |
 | **Stop on Failure** | Pause on failure, edit .feature, retry | [`07-stop-on-failure/`](examples/07-stop-on-failure/) |
 | **Browser Modes** | Headed, headless, or AgentCore (remote) | `--browser-mode headed` / `headless` |
@@ -408,7 +408,7 @@ The orchestrator accepts a JSON payload with these fields:
   "max_concurrency": 5,
   "tag_filter": "@smoke",
   "force_retranslate": true,
-  "bedrock_model_id": "us.anthropic.claude-sonnet-4-20250514-v1:0"
+  "bedrock_model_id": null
 }
 ```
 

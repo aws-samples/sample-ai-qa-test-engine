@@ -1,7 +1,7 @@
 @NextDotGym
-Feature: Screenshot + Claude Extraction
+Feature: Screenshot Extraction
   As a tester
-  I want to extract data from screenshots using Claude
+  I want to extract data from screenshots using AI vision
   So that I can capture complex visual information
 
   Background:
