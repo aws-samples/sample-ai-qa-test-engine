@@ -25,7 +25,6 @@ def cli():
 @click.option("--output-dir", type=click.Path(path_type=Path), help="Directory for reports")
 @click.option("--browser-mode", type=click.Choice(["headed", "headless"]), default=None, help="Browser mode")
 @click.option("--stop-on-failure", is_flag=True, default=False, help="Stop and keep browser open on failure")
-@click.option("--from-step", type=int, default=None, help="Resume from step N")
 @click.option("--force-translate", is_flag=True, default=False, help="Force re-translation (bypass cache)")
 @click.option("--video", is_flag=True, default=False, help="Enable video recording of browser session")
 @click.option("--no-cache", is_flag=True, default=False, help="Disable trajectory replay cache (always use Nova Act)")
@@ -42,7 +41,6 @@ def run(
     output_dir,
     browser_mode,
     stop_on_failure,
-    from_step,
     force_translate,
     video,
     no_cache,
@@ -67,8 +65,6 @@ def run(
         ai-qa-test run --feature-dir ./features/ --browser-mode headless
 
         ai-qa-test run --feature-dir ./features/ --force-translate
-
-        ai-qa-test run --feature-dir ./features/ --from-step 5
     """
     # Build config from CLI args (overrides env/.env)
     config_kwargs = {}
@@ -81,8 +77,6 @@ def run(
         config_kwargs["browser_mode"] = browser_mode
     if stop_on_failure:
         config_kwargs["stop_on_failure"] = True
-    if from_step:
-        config_kwargs["from_step"] = from_step
     if force_translate:
         config_kwargs["force_translate"] = True
     if video:

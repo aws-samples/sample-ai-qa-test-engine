@@ -262,7 +262,6 @@ ai-qa-test run --feature-dir ./features/ [options]
 | `--output-dir` | PATH | `./reports` | Directory for HTML reports |
 | `--browser-mode` | `headed`/`headless` | `headed` | Browser visibility mode |
 | `--stop-on-failure` | flag | off | Pause on failure, keep browser open for debugging |
-| `--from-step` | INT | — | Resume execution from step N |
 | `--force-translate` | flag | off | Bypass translation cache, re-translate all features |
 | `--video` | flag | off | Record browser session video |
 | `--no-cache` | flag | off | Disable trajectory replay (always use Nova Act) |

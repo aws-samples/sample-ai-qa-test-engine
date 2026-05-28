@@ -13,6 +13,7 @@
 - [ ] Fix Pydantic validation warning for `${variable}` references that come from input variables file
 - [ ] Local parallel execution (run multiple scenarios concurrently with `--parallel N`)
 - [ ] Improve HTML dashboard (charts, trend over time, collapsible step details, screenshots inline)
+- [ ] Attach to existing browser session and continue from step N (CDP connect to locally open browser)
 
 ## AgentCore Deployment
 - [ ] Save extracted variables as separate file in S3 (not just embedded in result.json)
