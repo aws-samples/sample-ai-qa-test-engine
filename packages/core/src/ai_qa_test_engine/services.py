@@ -124,8 +124,17 @@ class TestExecutionService:
         Returns:
             RunSummary with all results
         """
+        # Set up log file in report directory
+        report_dir = self.config.resolve_report_dir()
+        report_dir.mkdir(parents=True, exist_ok=True)
+        log_file_path = report_dir / "execution.log"
+        log_file = open(log_file_path, "w", encoding="utf-8")
 
         def log(msg: str, level: str = "info"):
+            # Write to log file
+            log_file.write(f"{msg}\n")
+            log_file.flush()
+            # Also send to callback/stdout
             if log_callback:
                 log_callback(msg, level)
             else:
@@ -228,7 +237,7 @@ class TestExecutionService:
                     feature_name=feature_name,
                     config=self.config,
                     functions=functions,
-                    log_callback=log_callback,
+                    log_callback=log,
                 )
                 all_results.append(result)
 
@@ -282,8 +291,10 @@ class TestExecutionService:
             f"Failed: {summary.failed} | Errors: {summary.errors}")
         log(f"  Duration: {duration:.2f}s")
         log(f"  Report: {report_path}")
+        log(f"  Log: {log_file_path}")
         log(f"{'=' * 70}")
 
+        log_file.close()
         return summary
 
     def _save_extracted_variables(self, result: ScenarioResult, feature_name: str) -> None:
