@@ -151,6 +151,9 @@ Attach `infra/iam-developer-policy.json` to the developer team's IAM role. This 
 
 # Fire and forget (don't wait for build)
 ./scripts/update-agent.sh --no-wait
+
+# Set custom idle timeout (default: 900s / 15 min)
+./scripts/update-agent.sh --idle-timeout 1800
 ```
 
 No CloudFormation, no admin involvement. Just rebuilds the container and tells AgentCore to pick up the new image.

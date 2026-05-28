@@ -16,14 +16,22 @@
 #   ./scripts/update-agent.sh --orchestrator-only      # Update orchestrator only
 #   ./scripts/update-agent.sh --stack-name my-stack    # Custom stack name
 #   ./scripts/update-agent.sh --no-wait                # Don't wait for build completion
+#   ./scripts/update-agent.sh --idle-timeout 1800      # Set idle session timeout (seconds)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# ============================================================
+# Configuration — edit these defaults or pass as CLI flags
+# ============================================================
 STACK_NAME="${STACK_NAME:-ai-qa-test-engine}"
 REGION="${AWS_REGION:-us-east-1}"
+IDLE_SESSION_TIMEOUT="${IDLE_SESSION_TIMEOUT:-900}"  # seconds (default: 15 min)
+MAX_LIFETIME="${MAX_LIFETIME:-28800}"                # seconds (default: 8 hours)
+# ============================================================
+
 UPDATE_RUNNER=true
 UPDATE_ORCHESTRATOR=true
 WAIT_FOR_BUILD=true
@@ -32,6 +40,8 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --stack-name) STACK_NAME="$2"; shift 2 ;;
         --region) REGION="$2"; shift 2 ;;
+        --idle-timeout) IDLE_SESSION_TIMEOUT="$2"; shift 2 ;;
+        --max-lifetime) MAX_LIFETIME="$2"; shift 2 ;;
         --runner-only) UPDATE_ORCHESTRATOR=false; shift ;;
         --orchestrator-only) UPDATE_RUNNER=false; shift ;;
         --no-wait) WAIT_FOR_BUILD=false; shift ;;
@@ -41,6 +51,8 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --stack-name NAME       CFN stack name (default: ai-qa-test-engine)"
             echo "  --region REGION         AWS region (default: us-east-1)"
+            echo "  --idle-timeout SECS     Idle session timeout in seconds (default: 900, range: 60-28800)"
+            echo "  --max-lifetime SECS     Max session lifetime in seconds (default: 28800, range: 60-28800)"
             echo "  --runner-only           Only update the test-runner agent"
             echo "  --orchestrator-only     Only update the orchestrator agent"
             echo "  --no-wait               Don't wait for CodeBuild to finish"
@@ -186,14 +198,22 @@ for o in outputs:
         break
 ")
         RUNNER_ID=$(echo "$RUNNER_ARN" | sed 's|.*/||')
+        # Preserve existing env vars
+        RUNNER_ENV=$(aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id "$RUNNER_ID" --region "$REGION" --query 'environmentVariables' --output json 2>/dev/null)
+        RUNNER_ENV_FLAG=""
+        if [ "$RUNNER_ENV" != "null" ] && [ -n "$RUNNER_ENV" ]; then
+            RUNNER_ENV_FLAG="--environment-variables $RUNNER_ENV"
+        fi
         aws bedrock-agentcore-control update-agent-runtime \
             --agent-runtime-id "$RUNNER_ID" \
             --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"${RUNNER_ECR}:latest\"}}" \
             --network-configuration '{"networkMode":"PUBLIC"}' \
+            --lifecycle-configuration "{\"idleRuntimeSessionTimeout\":${IDLE_SESSION_TIMEOUT},\"maxLifetime\":${MAX_LIFETIME}}" \
+            $RUNNER_ENV_FLAG \
             --role-arn "$ROLE_ARN" \
             --region "$REGION" \
             --output text --query 'agentRuntimeArn' > /dev/null
-        echo "  ✓ test-runner runtime updated"
+        echo "  ✓ test-runner runtime updated (idle_timeout=${IDLE_SESSION_TIMEOUT}s)"
     fi
 
     if [ "$UPDATE_ORCHESTRATOR" = true ]; then
@@ -214,14 +234,22 @@ for o in outputs:
         break
 ")
         ORCHESTRATOR_ID=$(echo "$ORCHESTRATOR_ARN" | sed 's|.*/||')
+        # Preserve existing env vars (e.g., TEST_RUNNER_ARN set by CFN)
+        ORCH_ENV=$(aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id "$ORCHESTRATOR_ID" --region "$REGION" --query 'environmentVariables' --output json 2>/dev/null)
+        ORCH_ENV_FLAG=""
+        if [ "$ORCH_ENV" != "null" ] && [ -n "$ORCH_ENV" ]; then
+            ORCH_ENV_FLAG="--environment-variables $ORCH_ENV"
+        fi
         aws bedrock-agentcore-control update-agent-runtime \
             --agent-runtime-id "$ORCHESTRATOR_ID" \
             --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"${ORCHESTRATOR_ECR}:latest\"}}" \
             --network-configuration '{"networkMode":"PUBLIC"}' \
+            --lifecycle-configuration "{\"idleRuntimeSessionTimeout\":${IDLE_SESSION_TIMEOUT},\"maxLifetime\":${MAX_LIFETIME}}" \
+            $ORCH_ENV_FLAG \
             --role-arn "$ROLE_ARN" \
             --region "$REGION" \
             --output text --query 'agentRuntimeArn' > /dev/null
-        echo "  ✓ orchestrator runtime updated"
+        echo "  ✓ orchestrator runtime updated (idle_timeout=${IDLE_SESSION_TIMEOUT}s)"
     fi
 else
     echo ""
