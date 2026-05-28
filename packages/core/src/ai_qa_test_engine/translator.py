@@ -30,7 +30,7 @@ def resolve_test_url(tags: list, tag_url_map: dict) -> str:
 
     Args:
         tags: List of feature tags (e.g., ["@NextDotGym"])
-        tag_url_map: Mapping of tag names to URLs
+        tag_url_map: Mapping of tag names to URLs (keys may or may not have @ prefix)
 
     Returns:
         Resolved URL string
@@ -38,13 +38,16 @@ def resolve_test_url(tags: list, tag_url_map: dict) -> str:
     Raises:
         ValueError: If no URL mapping found for any tag
     """
+    # Normalize map keys: strip @ and lowercase for consistent matching
+    normalized_map = {k.lstrip("@").lower(): v for k, v in tag_url_map.items()}
+
     for tag in tags:
         tag_name = tag.lstrip("@").lower()
-        if tag_name in tag_url_map:
-            return tag_url_map[tag_name]
+        if tag_name in normalized_map:
+            return normalized_map[tag_name]
 
-    if "default" in tag_url_map:
-        return tag_url_map["default"]
+    if "default" in normalized_map:
+        return normalized_map["default"]
 
     raise ValueError(f"No URL mapping found for tags: {tags}")
 
