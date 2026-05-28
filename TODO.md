@@ -25,6 +25,8 @@
 - [ ] Document CLI usage patterns in README (single file, directory, multiple files)
 - [ ] Add examples showing `--tags` with multiple feature files
 - [ ] Document .env file format with all available variables
+- [ ] Document screenshot+Claude extraction usage (prompt format, store as, model config)
+- [ ] Auto-inference mode for screenshot extraction (detect IDs, emails, VINs without explicit prompt)
 
 ## Future Features
 - [ ] Feature 6: Gauge support (.md + .cpt test format)
