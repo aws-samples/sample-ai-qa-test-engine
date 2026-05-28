@@ -161,11 +161,55 @@ No CloudFormation, no admin involvement. Just rebuilds the container and tells A
 # Upload tests to S3
 aws s3 sync ./my-tests/ s3://<bucket>/my-project/tests/
 
-# Invoke orchestrator
+# Invoke orchestrator (payload must be base64-encoded for AWS CLI)
+PAYLOAD=$(echo '{"input_bucket":"<bucket>","input_prefix":"my-project/tests/","output_bucket":"<bucket>","output_prefix":"my-project/results","test_runner_arn":"<test-runner-arn>","max_concurrency":10}' | base64)
 aws bedrock-agentcore invoke-agent-runtime \
   --agent-runtime-arn <orchestrator-arn> \
-  --payload '{"input_bucket":"<bucket>","input_prefix":"my-project/tests/","output_bucket":"<bucket>","output_prefix":"my-project/results","test_runner_arn":"<test-runner-arn>","max_concurrency":10}'
+  --payload "$PAYLOAD" \
+  --cli-read-timeout 300 \
+  --region us-east-1 /tmp/result.json
 ```
+
+> **Important — `--cli-read-timeout`**: The AWS CLI's default socket read timeout is ~60s. For invocations expected to run longer than 60 seconds (most real test runs), pass `--cli-read-timeout 300` (or higher, up to 900). Without this, the CLI will retry on its own when its read timeout fires — even though the agent is still working — and you'll see duplicate executions.
+
+### Tag-to-URL Mapping Format
+
+The `tag-url-mapping.json` file in your test S3 prefix maps Gherkin `@tags` to starting URLs:
+
+```json
+{
+  "@MyApp": "https://my-app.example.com",
+  "@Staging": "https://staging.example.com",
+  "default": "https://default.example.com"
+}
+```
+
+Keys are matched case-insensitively, with or without the `@` prefix — so `@MyApp`, `myapp`, or `MyApp` all resolve to the same URL.
+
+### Lifecycle Configuration (Idle Timeout)
+
+Each AgentCore Runtime has two lifecycle settings:
+
+| Setting | Default | Range | What it controls |
+|---------|---------|-------|------------------|
+| `idleRuntimeSessionTimeout` | 900s (15 min) | 60s–28800s | Time the platform considers a session "idle" before terminating |
+| `maxLifetime` | 28800s (8 hr) | 60s–28800s | Maximum total session age regardless of activity |
+
+**Important**: A handler that blocks synchronously (e.g., `time.sleep(120)`, browser automation, long custom functions) is considered "idle" by the platform unless you explicitly signal otherwise. Both agents in this project use `add_async_task` / `complete_async_task` to mark themselves as `HealthyBusy` during long operations, which prevents the platform from killing the session during sync work.
+
+To override the default timeout for a runtime:
+
+```bash
+aws bedrock-agentcore-control update-agent-runtime \
+  --agent-runtime-id <runtime-id> \
+  --agent-runtime-artifact '{"containerConfiguration":{"containerUri":"<ecr-uri>:latest"}}' \
+  --network-configuration '{"networkMode":"PUBLIC"}' \
+  --lifecycle-configuration '{"idleRuntimeSessionTimeout":1800,"maxLifetime":28800}' \
+  --role-arn <execution-role-arn> \
+  --region us-east-1
+```
+
+**Synchronous request limit**: regardless of session lifecycle, a single synchronous `InvokeAgentRuntime` HTTP request is bounded by **15 minutes** (AWS service quota, not adjustable). Use multiple invocations (or a future async polling pattern) for runs that exceed this.
 
 ### IAM Reference Files
 
@@ -485,42 +529,11 @@ ai-qa-test run --feature-dir ./features/ --common-steps-dir ./common_steps/
 
 The `@include` directive is expanded before translation — the AI sees the full steps, not the include reference.
 
-## AgentCore Deployment (Parallel Execution at Scale)
+## AgentCore Deployment — Quick Reference
 
-Deploy the engine to AWS AgentCore for parallel test execution with S3 I/O. No Docker or CLI tools needed locally — just AWS CLI.
+For full deployment guide, see the [AgentCore Deployment section](#agentcore-deployment-parallel-execution-at-scale) above.
 
-**Deploy:**
-```bash
-./scripts/deploy.sh                    # Creates everything (IAM, ECR, CodeBuild, runtimes)
-./scripts/deploy.sh --role-arn ARN     # Use pre-created role
-./scripts/deploy.sh --test-bucket X    # Use pre-created bucket
-```
-
-**Upload tests and run:**
-```bash
-# Upload your test suite to S3
-aws s3 sync ./my-tests/ s3://<bucket>/my-project/tests/
-
-# Invoke orchestrator (runs all scenarios in parallel)
-PAYLOAD=$(echo '{"input_bucket":"<bucket>","input_prefix":"my-project/tests/","output_bucket":"<bucket>","output_prefix":"my-project/results","test_runner_arn":"<runner-arn>","max_concurrency":10}' | base64)
-aws bedrock-agentcore invoke-agent-runtime \
-  --agent-runtime-arn <orchestrator-arn> \
-  --payload "$PAYLOAD" \
-  --cli-read-timeout 300 \
-  --region us-east-1 /tmp/result.json
-```
-
-**S3 input structure:**
-```
-my-project/tests/
-├── features/              ← .feature files
-├── tag-url-mapping.json   ← URL mappings
-├── custom-functions/      ← (optional) Python functions
-│   └── custom_functions.py
-└── translated/            ← (auto-managed) translation cache
-```
-
-**Results:**
+**Results location:**
 ```
 my-project/results/run-20260526-123456/
 ├── summary.json           ← pass/fail counts, durations
@@ -535,3 +548,4 @@ my-project/results/run-20260526-123456/
 ```bash
 ./scripts/destroy.sh       # Removes all AWS resources
 ```
+
