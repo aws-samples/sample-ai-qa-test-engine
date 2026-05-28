@@ -66,6 +66,7 @@ ai-qa-test run --feature-dir .\features\ --browser-mode headed
 | **Trajectory Replay** | Cache browser trajectories, replay without AI model calls | [`08-trajectory-replay/`](examples/08-trajectory-replay/) |
 | **@no-cache Annotation** | Skip trajectory cache for specific steps | [`08-trajectory-replay/trajectory.feature`](examples/08-trajectory-replay/trajectory.feature) |
 | **@id Tag** | Assign explicit scenario IDs for stable naming | [`02-extraction-validation/extraction.feature`](examples/02-extraction-validation/extraction.feature) |
+| **Tag Filtering** | Run specific scenarios by tag (`--tags @smoke`, `not @slow`) | [`02-extraction-validation/extraction.feature`](examples/02-extraction-validation/extraction.feature) |
 | **Trajectory Strict** | Validate URL/screenshot/DOM during replay | `--trajectory-strict` fails on page state mismatch |
 | **AgentCore Deploy** | Parallel execution at scale with S3 I/O | `./scripts/deploy-infra.sh` + `./scripts/update-agent.sh` |
 | **Screenshot on Fail** | Auto-captures screenshot when a step fails | Embedded in HTML report |
