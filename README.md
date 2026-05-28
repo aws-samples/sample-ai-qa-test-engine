@@ -245,39 +245,172 @@ ai-qa-test-engine/
 └── pyproject.toml               # uv workspace
 ```
 
-## CLI Commands
+## CLI Reference
+
+### `ai-qa-test run`
+
+Execute tests from Gherkin feature files.
 
 ```bash
-# Execute tests
 ai-qa-test run --feature-dir ./features/ [options]
+```
 
-# Options:
-#   --browser-mode [headed|headless]  Browser mode (default: headed)
-#   --stop-on-failure                 Stop and keep browser open on failure
-#   --from-step N                     Resume from step N
-#   --force-translate                 Bypass translation cache
-#   --no-cache                        Disable trajectory replay (always use Nova Act)
-#   --trajectory-strict               Strict trajectory validation (fail on mismatch)
-#   --video                           Enable video recording
-#   --tag key=url                     Tag-to-URL mapping
-#   --functions-file path.py          Custom functions file
-#   --tag-url-map-file map.json       Tag-URL mapping JSON file
-#   --env-file .env                   Environment file
-#   --variables-file vars.json        Pre-load variables from JSON
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--feature-dir` | PATH | required | Directory containing .feature files |
+| `--output-dir` | PATH | `./reports` | Directory for HTML reports |
+| `--browser-mode` | `headed`/`headless` | `headed` | Browser visibility mode |
+| `--stop-on-failure` | flag | off | Pause on failure, keep browser open for debugging |
+| `--from-step` | INT | — | Resume execution from step N |
+| `--force-translate` | flag | off | Bypass translation cache, re-translate all features |
+| `--video` | flag | off | Record browser session video |
+| `--no-cache` | flag | off | Disable trajectory replay (always use Nova Act) |
+| `--trajectory-strict` | flag | off | Fail if page state differs during trajectory replay |
+| `--tags` | STRING | — | Filter scenarios by tag (`@smoke`, `not @slow`, `@id:TC-001`) |
+| `--tag` | KEY=URL | — | Tag-to-URL mapping (repeatable) |
+| `--functions-file` | PATH | — | Custom functions .py file or directory (repeatable) |
+| `--env-file` | PATH | `.env` | Path to environment file |
+| `--tag-url-map-file` | PATH | — | Path to tag-url-mapping.json |
+| `--common-steps-dir` | PATH | — | Directory containing .steps files for @include |
+| `--variables-file` | PATH | — | JSON file with pre-loaded input variables |
 
-# Translate only
+### `ai-qa-test translate`
+
+Translate Gherkin features to JSON without executing.
+
+```bash
 ai-qa-test translate --feature-dir ./features/ [options]
 ```
 
-## Configuration
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--feature-dir` | PATH | required | Directory containing .feature files |
+| `--output-dir` | PATH | `./translated` | Directory for translated JSON output |
+| `--tag` | KEY=URL | — | Tag-to-URL mapping (repeatable) |
+| `--model-id` | STRING | — | Bedrock model ID for translation |
+| `--force` | flag | off | Force re-translation (bypass cache) |
+| `--env-file` | PATH | `.env` | Path to environment file |
+| `--tag-url-map-file` | PATH | — | Path to tag-url-mapping.json |
 
-Configuration is loaded from (in order of precedence):
-1. CLI flags
-2. Environment variables
-3. `.env` file in working directory
-4. Defaults
+### `ai-qa-test validate`
 
-See `sample-tests/feature-01-core-execution/.env` for a complete example.
+Check variable references and function calls without running browser.
+
+```bash
+ai-qa-test validate --feature-dir ./features/ [options]
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--feature-dir` | PATH | required | Directory containing .feature files |
+| `--functions-file` | PATH | — | Custom functions .py file |
+| `--tag-url-map-file` | PATH | — | Path to tag-url-mapping.json |
+| `--env-file` | PATH | `.env` | Path to environment file |
+| `--force-translate` | flag | off | Force re-translation before validating |
+
+## Environment Variables
+
+All CLI options can also be set via environment variables (in `.env` or exported):
+
+| Variable | CLI Equivalent | Description |
+|----------|---------------|-------------|
+| `FEATURE_DIR` | `--feature-dir` | Feature files directory |
+| `REPORT_DIR` | `--output-dir` | Reports output directory |
+| `BROWSER_MODE` | `--browser-mode` | `headed` or `headless` |
+| `STOP_ON_FAILURE` | `--stop-on-failure` | `true`/`false` |
+| `FORCE_TRANSLATE` | `--force-translate` | `true`/`false` |
+| `ENABLE_VIDEO_RECORDING` | `--video` | `true`/`false` |
+| `NO_CACHE` | `--no-cache` | `true`/`false` |
+| `TRAJECTORY_STRICT` | `--trajectory-strict` | `true`/`false` |
+| `CUSTOM_FUNCTIONS_FILE` | `--functions-file` | Path to .py file or directory |
+| `TAG_URL_MAP_FILE` | `--tag-url-map-file` | Path to mapping JSON |
+| `COMMON_STEPS_DIR` | `--common-steps-dir` | Path to .steps directory |
+| `INPUT_VARIABLES_FILE` | `--variables-file` | Path to variables JSON |
+| `DEFAULT_TEST_URL` | — | Fallback URL when no tag matches |
+| `GHERKIN_TAG_<NAME>` | `--tag NAME=url` | Per-tag URL mapping (e.g., `GHERKIN_TAG_MYAPP=https://...`) |
+| `BEDROCK_MODEL_ID` | `--model-id` | Bedrock model for translation |
+| `NOVA_ACT_API_KEY` | — | Nova Act API key (skips WorkflowDefinition) |
+
+## Scripts Reference
+
+### `scripts/deploy-infra.sh` (Admin — one-time)
+
+```bash
+./scripts/deploy-infra.sh [options]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--stack-name NAME` | `ai-qa-test-engine` | CloudFormation stack name |
+| `--region REGION` | `us-east-1` | AWS region |
+| `--role-arn ARN` | — | Pre-created IAM role (skip role creation) |
+| `--test-bucket NAME` | — | Pre-created S3 bucket (skip bucket creation) |
+
+### `scripts/update-agent.sh` (Developer — ongoing)
+
+```bash
+./scripts/update-agent.sh [options]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--stack-name NAME` | `ai-qa-test-engine` | CloudFormation stack name |
+| `--region REGION` | `us-east-1` | AWS region |
+| `--runner-only` | — | Only update the test-runner agent |
+| `--orchestrator-only` | — | Only update the orchestrator agent |
+| `--no-wait` | — | Don't wait for CodeBuild to finish |
+| `--idle-timeout SECS` | `900` | Idle session timeout (60–28800) |
+| `--max-lifetime SECS` | `28800` | Max session lifetime (60–28800) |
+
+Environment variable overrides: `STACK_NAME`, `AWS_REGION`, `IDLE_SESSION_TIMEOUT`, `MAX_LIFETIME`
+
+### `scripts/destroy.sh`
+
+```bash
+./scripts/destroy.sh [--stack-name NAME] [--region REGION]
+```
+
+Removes all AWS resources (ECR, CodeBuild, runtimes, S3 bucket, IAM roles).
+
+## Orchestrator Payload Reference
+
+The orchestrator accepts a JSON payload with these fields:
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `input_bucket` | yes | — | S3 bucket containing test features |
+| `input_prefix` | yes | — | S3 prefix for test files (e.g., `my-project/tests/`) |
+| `output_bucket` | yes | — | S3 bucket for results |
+| `output_prefix` | yes | — | S3 prefix for results (e.g., `my-project/results`) |
+| `test_runner_arn` | no | `TEST_RUNNER_ARN` env var | Override test runner ARN (set automatically by CFN) |
+| `max_concurrency` | no | `10` | Max parallel test runner invocations |
+| `force_retranslate` | no | `false` | Force re-translation of all features |
+| `bedrock_model_id` | no | — | Override Bedrock model for translation |
+| `tag_filter` | no | — | Filter scenarios by tag (e.g., `@smoke`, `not @slow`) |
+
+**Minimal payload** (test_runner_arn comes from env var):
+```json
+{
+  "input_bucket": "my-bucket",
+  "input_prefix": "my-project/tests/",
+  "output_bucket": "my-bucket",
+  "output_prefix": "my-project/results"
+}
+```
+
+**Full payload:**
+```json
+{
+  "input_bucket": "my-bucket",
+  "input_prefix": "my-project/tests/",
+  "output_bucket": "my-bucket",
+  "output_prefix": "my-project/results",
+  "max_concurrency": 5,
+  "tag_filter": "@smoke",
+  "force_retranslate": true,
+  "bedrock_model_id": "us.anthropic.claude-sonnet-4-20250514-v1:0"
+}
+```
 
 ## Scenario IDs
 
