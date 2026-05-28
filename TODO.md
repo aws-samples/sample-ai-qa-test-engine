@@ -11,6 +11,8 @@
 - [ ] Global variables (`${global.name}`) vs scenario-scoped (`${name}`)
 - [ ] Run-ID-based output directories (preserve history instead of overwriting reports)
 - [ ] Fix Pydantic validation warning for `${variable}` references that come from input variables file
+- [ ] Local parallel execution (run multiple scenarios concurrently with `--parallel N`)
+- [ ] Improve HTML dashboard (charts, trend over time, collapsible step details, screenshots inline)
 
 ## AgentCore Deployment
 - [ ] Save extracted variables as separate file in S3 (not just embedded in result.json)
