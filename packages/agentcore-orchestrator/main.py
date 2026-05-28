@@ -111,8 +111,16 @@ def handler(payload):
             list_objects, get_last_modified,
         )
 
+        # Fallback: if no features/ subdir, search the entire input_prefix
         if not cache_status:
-            raise ValueError(f"No .feature files found in s3://{input_bucket}/{features_prefix}")
+            features_prefix = input_prefix
+            cache_status = _check_cache(
+                input_bucket, features_prefix, translated_prefix, force_retranslate,
+                list_objects, get_last_modified,
+            )
+
+        if not cache_status:
+            raise ValueError(f"No .feature files found in s3://{input_bucket}/{input_prefix} (searched features/ subdir and root)")
 
         # Step 3: Translate stale features
         _translate_stale(

@@ -200,16 +200,16 @@ for o in outputs:
         RUNNER_ID=$(echo "$RUNNER_ARN" | sed 's|.*/||')
         # Preserve existing env vars
         RUNNER_ENV=$(aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id "$RUNNER_ID" --region "$REGION" --query 'environmentVariables' --output json 2>/dev/null)
-        RUNNER_ENV_FLAG=""
+        ENV_ARGS=()
         if [ "$RUNNER_ENV" != "null" ] && [ -n "$RUNNER_ENV" ]; then
-            RUNNER_ENV_FLAG="--environment-variables $RUNNER_ENV"
+            ENV_ARGS=(--environment-variables "$RUNNER_ENV")
         fi
         aws bedrock-agentcore-control update-agent-runtime \
             --agent-runtime-id "$RUNNER_ID" \
             --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"${RUNNER_ECR}:latest\"}}" \
             --network-configuration '{"networkMode":"PUBLIC"}' \
             --lifecycle-configuration "{\"idleRuntimeSessionTimeout\":${IDLE_SESSION_TIMEOUT},\"maxLifetime\":${MAX_LIFETIME}}" \
-            $RUNNER_ENV_FLAG \
+            "${ENV_ARGS[@]}" \
             --role-arn "$ROLE_ARN" \
             --region "$REGION" \
             --output text --query 'agentRuntimeArn' > /dev/null
@@ -236,16 +236,16 @@ for o in outputs:
         ORCHESTRATOR_ID=$(echo "$ORCHESTRATOR_ARN" | sed 's|.*/||')
         # Preserve existing env vars (e.g., TEST_RUNNER_ARN set by CFN)
         ORCH_ENV=$(aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id "$ORCHESTRATOR_ID" --region "$REGION" --query 'environmentVariables' --output json 2>/dev/null)
-        ORCH_ENV_FLAG=""
+        ENV_ARGS=()
         if [ "$ORCH_ENV" != "null" ] && [ -n "$ORCH_ENV" ]; then
-            ORCH_ENV_FLAG="--environment-variables $ORCH_ENV"
+            ENV_ARGS=(--environment-variables "$ORCH_ENV")
         fi
         aws bedrock-agentcore-control update-agent-runtime \
             --agent-runtime-id "$ORCHESTRATOR_ID" \
             --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"${ORCHESTRATOR_ECR}:latest\"}}" \
             --network-configuration '{"networkMode":"PUBLIC"}' \
             --lifecycle-configuration "{\"idleRuntimeSessionTimeout\":${IDLE_SESSION_TIMEOUT},\"maxLifetime\":${MAX_LIFETIME}}" \
-            $ORCH_ENV_FLAG \
+            "${ENV_ARGS[@]}" \
             --role-arn "$ROLE_ARN" \
             --region "$REGION" \
             --output text --query 'agentRuntimeArn' > /dev/null
