@@ -665,6 +665,57 @@ ai-qa-test run --feature-dir ./features/ --common-steps-dir ./common_steps/
 
 The `@include` directive is expanded before translation — the AI sees the full steps, not the include reference.
 
+## Secrets (Credentials & Sensitive Data)
+
+Secrets are fetched at runtime — never hardcoded in `.feature` files.
+
+**Lookup order:**
+1. Environment variable (`.env` file or shell)
+2. AWS Secrets Manager (automatic fallback if env var not found)
+
+**Local development (env vars):**
+```bash
+# Set in .env or export in shell
+TEST_EMAIL=fakeuser@example.com
+TEST_PASSWORD=my_secret_pass
+
+# Run
+ai-qa-test run --feature-dir ./examples/05-excel-secrets/secrets.feature \
+  --tag-url-map-file ./examples/05-excel-secrets/tag-url-mapping.json
+```
+
+**AWS (Secrets Manager) — for AgentCore or CI/CD:**
+```bash
+# Create the secret
+aws secretsmanager create-secret \
+  --name TEST_EMAIL \
+  --secret-string "real-user@company.com" \
+  --region us-east-1
+
+# Or as a JSON bundle (multiple values in one secret)
+aws secretsmanager create-secret \
+  --name my-app/credentials \
+  --secret-string '{"TEST_EMAIL":"user@co.com","TEST_PASSWORD":"s3cret"}' \
+  --region us-east-1
+```
+
+The engine auto-detects: if the env var isn't set, it tries AWS Secrets Manager with the same name.
+
+**In Gherkin:**
+```gherkin
+# Fetch and store
+When I call 'get_secret' with secret_name "TEST_EMAIL" and store as "email"
+
+# Use in a step
+And I enter "${email}" for username
+```
+
+**Secure typing** (Playwright, not Nova Act — bypasses guardrails on auth pages):
+```gherkin
+And I enter "user@example.com" for username    # Uses Playwright keyboard.type()
+And I enter "password123" for password         # Uses Playwright keyboard.type()
+```
+
 ## AgentCore Deployment — Quick Reference
 
 For full deployment guide, see the [AgentCore Deployment section](#agentcore-deployment-parallel-execution-at-scale) above.
