@@ -161,7 +161,6 @@ def translate(feature_dir, output_dir, tag, model_id, force, env_file, tag_url_m
         config_kwargs["feature_dir"] = feature_dir
     if output_dir:
         config_kwargs["cache_dir"] = output_dir
-        config_kwargs["translated_feature_dir"] = output_dir
     if model_id:
         config_kwargs["bedrock_model_id"] = model_id
     if force:

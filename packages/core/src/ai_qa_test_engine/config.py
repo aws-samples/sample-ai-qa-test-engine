@@ -1,6 +1,5 @@
 """Unified configuration for AI QA Test Engine.
 
-Ported from test_translator/config/app_config.py + decorators.py.
 Extended with CLI args, browser mode, cache settings.
 """
 
@@ -124,12 +123,6 @@ class AppConfig(BaseSettings):
         default=Path("features"),
         alias="FEATURE_DIR",
         description="Directory containing Gherkin .feature files",
-    )
-
-    translated_feature_dir: Path = Field(
-        default=Path("translated"),
-        alias="TRANSLATED_FEATURE_DIR",
-        description="Directory for translated JSON test files (cache)",
     )
 
     extracted_variables_dir: Path = Field(
@@ -263,9 +256,6 @@ class AppConfig(BaseSettings):
 
     def resolve_feature_dir(self) -> Path:
         return self._resolve_path(self.feature_dir)
-
-    def resolve_translated_feature_dir(self) -> Path:
-        return self._resolve_path(self.translated_feature_dir)
 
     def resolve_extracted_variables_dir(self) -> Path:
         return self._resolve_path(self.extracted_variables_dir)

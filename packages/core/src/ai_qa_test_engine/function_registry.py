@@ -1,6 +1,5 @@
 """Custom functions registry and execution.
 
-Ported from test_translator/utils/function_helpers.py + execution.py function handling.
 Extended with FunctionRegistry class for bundled + user function management.
 """
 

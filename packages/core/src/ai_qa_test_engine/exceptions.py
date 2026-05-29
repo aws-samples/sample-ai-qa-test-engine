@@ -20,9 +20,4 @@ class TranslationError(Exception):
         super().__init__(self.message)
 
 
-class ExecutionError(Exception):
-    """Raised when test execution encounters an unrecoverable error."""
 
-    def __init__(self, message: str):
-        self.message = message
-        super().__init__(self.message)

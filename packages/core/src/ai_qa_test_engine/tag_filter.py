@@ -63,25 +63,3 @@ def _tag_matches(normalized_tags: List[str], tag_expr: str) -> bool:
             return True
 
     return False
-
-
-def filter_scenarios(scenarios: list, tag_filter: str) -> list:
-    """Filter a list of scenarios by tag expression.
-
-    Args:
-        scenarios: List of TestScenario objects or dicts with 'tags' field
-        tag_filter: Tag filter expression
-
-    Returns:
-        Filtered list of scenarios that match
-    """
-    if not tag_filter:
-        return scenarios
-
-    filtered = []
-    for scenario in scenarios:
-        tags = scenario.tags if hasattr(scenario, "tags") else scenario.get("tags", [])
-        if matches_tag_filter(tags, tag_filter):
-            filtered.append(scenario)
-
-    return filtered

@@ -75,17 +75,4 @@ def load_excel_field(file: str, sheet: str, field: str, row: int = 1) -> str:
     return str(data[normalized_field])
 
 
-def get_secret(secret_name: str, context: dict = None) -> str:
-    """Fetch a secret from AWS Secrets Manager or local .env.
 
-    Args:
-        secret_name: Name of the secret to fetch
-        context: Execution context (injected automatically)
-
-    Returns:
-        Secret value as string
-    """
-    from ai_qa_test_engine.secrets import SecretsManager
-
-    manager = SecretsManager()
-    return manager.get_secret(secret_name)

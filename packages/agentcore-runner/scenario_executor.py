@@ -39,15 +39,12 @@ def execute_scenario_agentcore(
         Result dict with status, duration, steps, errors
     """
     from ai_qa_test_engine.models import TestScenario
-    from ai_qa_test_engine.config import AppConfig
     from ai_qa_test_engine.function_registry import FunctionRegistry
-    from ai_qa_test_engine.executor import execute_scenario, _execute_step, substitute_variables
+    from ai_qa_test_engine.executor import _execute_step
     from ai_qa_test_engine.browser import make_workflow_name
-    from ai_qa_test_engine.models import StepResult
     from ai_qa_test_engine.nova_act_client import NovaActClient
     from ai_qa_test_engine.nova_act_qa import NovaActQa
     from nova_act import Workflow
-    from unittest.mock import patch
 
     start_time = time.time()
     scenario = TestScenario.model_validate(scenario_data)

@@ -1,7 +1,6 @@
 """Custom functions for test execution.
 
 These functions can be called from Gherkin steps using function call syntax.
-Ported from test_translator/custom_functions_sample.py.
 """
 
 

@@ -1,6 +1,5 @@
 """Test execution engine.
 
-Ported from test_translator/utils/execution.py.
 Modifications:
 - Browser creation extracted to browser.py
 - StepResult collection added for reporting
@@ -17,7 +16,6 @@ from ai_qa_test_engine.browser import create_browser_session, make_workflow_name
 from ai_qa_test_engine.config import AppConfig
 from ai_qa_test_engine.function_registry import FunctionRegistry
 from ai_qa_test_engine.models import (
-    Feature,
     ScenarioResult,
     StepResult,
     TestScenario,
