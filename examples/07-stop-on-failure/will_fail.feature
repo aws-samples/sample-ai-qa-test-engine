@@ -1,7 +1,8 @@
-@NextDotGym @negative-test
+@NextDotGym
 Feature: Intentional Failure Test
   This test has a step that will fail to demonstrate --stop-on-failure
 
+  @negative-test
   Scenario: Navigate then fail on wrong assertion
     Given I am on the home page
     When I navigate to the destinations section

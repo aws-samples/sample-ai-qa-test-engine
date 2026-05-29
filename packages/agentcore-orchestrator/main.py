@@ -410,18 +410,21 @@ def _decompose(features, run_id, custom_functions_s3, input_variables_s3, data_f
     for feature_data in features:
         feature_name = feature_data.get("_feature_name", "unknown")
         base_url = feature_data.get("base_url", "")
+        feature_tags = feature_data.get("tags", [])
 
         for idx, scenario in enumerate(feature_data.get("scenarios", [])):
             scenario_name = scenario.get("name", f"scenario_{idx}")
-            tags = scenario.get("tags", [])
+            # Merge feature-level tags with scenario-level tags for filtering
+            scenario_tags = scenario.get("tags", [])
+            all_tags = list(set(feature_tags + scenario_tags))
 
             # Apply tag filter
             if tag_filter:
-                if not _matches_tag_filter(tags, tag_filter):
+                if not _matches_tag_filter(all_tags, tag_filter):
                     continue
 
             # Generate canonical scenario ID
-            scenario_id = _make_scenario_id(feature_name, scenario_name, tags)
+            scenario_id = _make_scenario_id(feature_name, scenario_name, scenario_tags)
 
             payload = {
                 "scenario": scenario,
