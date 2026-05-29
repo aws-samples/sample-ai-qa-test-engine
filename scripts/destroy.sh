@@ -10,12 +10,15 @@ set -euo pipefail
 STACK_NAME="${STACK_NAME:-ai-qa-test-engine}"
 REGION="${AWS_REGION:-us-east-1}"
 
+FORCE=false
+
 while [[ $# -gt 0 ]]; do
     case $1 in
         --stack-name) STACK_NAME="$2"; shift 2 ;;
         --region) REGION="$2"; shift 2 ;;
+        --force) FORCE=true; shift ;;
         --help)
-            echo "Usage: ./scripts/destroy.sh [--stack-name NAME] [--region REGION]"
+            echo "Usage: ./scripts/destroy.sh [--stack-name NAME] [--region REGION] [--force]"
             exit 0 ;;
         *) echo "Unknown: $1"; exit 1 ;;
     esac
@@ -39,10 +42,12 @@ echo "    • CodeBuild projects"
 echo "    • Lambda function"
 echo "    • S3 buckets: $TEST_BUCKET, $DEPLOY_BUCKET"
 echo ""
-read -p "  Are you sure? (yes/no): " CONFIRM
-if [ "$CONFIRM" != "yes" ]; then
-    echo "  Aborted."
-    exit 0
+if [ "$FORCE" != true ]; then
+    read -p "  Are you sure? (yes/no): " CONFIRM
+    if [ "$CONFIRM" != "yes" ]; then
+        echo "  Aborted."
+        exit 0
+    fi
 fi
 
 echo ""
