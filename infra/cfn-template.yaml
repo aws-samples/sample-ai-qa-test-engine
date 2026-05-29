@@ -442,10 +442,6 @@ Resources:
         SubnetIds: !If [IsVPC, !Ref SubnetIds, !Ref 'AWS::NoValue']
         SecurityGroupIds: !If [IsVPC, !Ref SecurityGroupIds, !Ref 'AWS::NoValue']
       Description: 'AI QA Test Engine — Test Runner'
-      EnvironmentVariables: !If
-        - IsVPC
-        - BROWSER_IDENTIFIER: !Sub '${ProjectName}-vpc-browser'
-        - !Ref 'AWS::NoValue'
 
   OrchestratorRuntime:
     Type: AWS::BedrockAgentCore::Runtime
@@ -465,22 +461,6 @@ Resources:
       Description: 'AI QA Test Engine — Orchestrator'
       EnvironmentVariables:
         TEST_RUNNER_ARN: !GetAtt TestRunnerRuntime.AgentRuntimeArn
-
-  # ============================================================
-  # AgentCore Browser (VPC mode only)
-  # ============================================================
-  VPCBrowser:
-    Type: AWS::BedrockAgentCore::Browser
-    Condition: IsVPC
-    Properties:
-      Name: !Sub '${ProjectName}-vpc-browser'
-      Description: 'AI QA Test Engine — VPC Browser for internal app testing'
-      NetworkConfiguration:
-        NetworkMode: VPC
-        NetworkModeConfig:
-          Subnets: !Ref SubnetIds
-          SecurityGroups: !Ref SecurityGroupIds
-      ExecutionRoleArn: !If [CreateRole, !GetAtt AgentCoreExecutionRole.Arn, !Ref ExistingRoleArn]
 
 
 Outputs:
@@ -511,8 +491,3 @@ Outputs:
   OrchestratorECRUri:
     Description: ECR repository URI for Orchestrator
     Value: !GetAtt OrchestratorECR.RepositoryUri
-
-  BrowserIdentifier:
-    Condition: IsVPC
-    Description: VPC Browser identifier for internal app testing
-    Value: !Sub '${ProjectName}-vpc-browser'
