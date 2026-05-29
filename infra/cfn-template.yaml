@@ -132,12 +132,9 @@ Resources:
                 Resource: !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:runtime/*'
               - Sid: NovaAct
                 Effect: Allow
-                Action:
-                  - nova-act:CreateWorkflowDefinition
-                  - nova-act:GetWorkflowDefinition
-                  - nova-act:CreateWorkflowRun
-                  - nova-act:CreateSession
-                  - nova-act:CreateAct
+                # Nova Act SDK uses undocumented actions (InvokeActStep, etc.)
+                # Explicit list insufficient — using service wildcard
+                Action: ['nova-act:*']
                 Resource: '*'
               - Sid: Browser
                 Effect: Allow

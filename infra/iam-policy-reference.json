@@ -50,13 +50,10 @@
         "Sid": "NovaAct",
         "Effect": "Allow",
         "Action": [
-          "nova-act:CreateWorkflowDefinition",
-          "nova-act:GetWorkflowDefinition",
-          "nova-act:CreateWorkflowRun",
-          "nova-act:CreateSession",
-          "nova-act:CreateAct"
+          "nova-act:*"
         ],
-        "Resource": "*"
+        "Resource": "*",
+        "_comment": "Nova Act SDK uses undocumented actions (InvokeActStep, etc.) — explicit list insufficient"
       },
       {
         "Sid": "AgentCoreBrowser",
