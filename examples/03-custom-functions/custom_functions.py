@@ -54,15 +54,16 @@ def get_destination_stats(destination: str) -> dict:
     return data.get(destination, {"gravity": "unknown", "distance": "unknown", "price": "unknown"})
 
 
-def get_credentials(env: str = "test") -> tuple:
-    """Return username and password as a tuple — use 'store as "user, pass"'.
+def get_multi_value(category: str = "destination") -> tuple:
+    """Return two values as a tuple — use 'store as "val1, val2"'.
 
     Example Gherkin:
-        When I call 'get_credentials' with env "test" and store as "username, password"
-        Then "${username}" should equal "testuser@example.com"
+        When I call 'get_multi_value' with category "destination" and store as "dest_name, expected_gravity"
+        And I select "${dest_name}" from the destinations
+        Then the gravity information should contain "${expected_gravity}"
     """
-    creds = {
-        "test": ("testuser@example.com", "test_pass_123"),
-        "staging": ("staging_user@example.com", "staging_pass_456"),
+    data = {
+        "destination": ("Proxima Centauri b", "1.1g"),
+        "journey": ("Earth - Terminal 1", "Proxima Centauri b"),
     }
-    return creds.get(env, ("unknown", "unknown"))
+    return data.get(category, ("unknown", "unknown"))

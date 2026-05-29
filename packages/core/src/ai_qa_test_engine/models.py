@@ -124,6 +124,11 @@ class TestScenario(BaseModel):
                 for match in _VARIABLE_PATTERN.finditer(text):
                     var_name = match.group(1)
                     if var_name not in defined_variables:
+                        # Check for dotted reference (dict unpack): ${stats.gravity} → "stats.*" in set
+                        if "." in var_name:
+                            base_name = var_name.split(".")[0]
+                            if f"{base_name}.*" in defined_variables or base_name in defined_variables:
+                                continue
                         raise ValueError(
                             f"Undefined variable reference '${{{var_name}}}' in step {step_idx}: "
                             f"'{step.original_text}'. Variable must be extracted in an earlier step."
@@ -133,7 +138,15 @@ class TestScenario(BaseModel):
             if step.extraction:
                 defined_variables.add(step.extraction.extraction_key)
             if step.function_call and step.function_call.storage_key:
-                defined_variables.add(step.function_call.storage_key)
+                storage_key = step.function_call.storage_key
+                # Support comma-separated keys for tuple unpack: "var1, var2"
+                if "," in storage_key:
+                    for k in storage_key.split(","):
+                        defined_variables.add(k.strip())
+                else:
+                    defined_variables.add(storage_key)
+                    # Dict return auto-unpacks to storage_key.field — allow any dotted reference
+                    defined_variables.add(f"{storage_key}.*")
 
         return self
 

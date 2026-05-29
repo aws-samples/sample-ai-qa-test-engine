@@ -101,6 +101,14 @@ FUNCTION CALL STEPS - Recognize and parse custom function calls:
     - "call 'lookup_customer' with phone '555-1234' and return is 'customer_id'"
       → function_name: "lookup_customer", parameters: {"phone": "555-1234"}, storage_key: "customer_id"
     
+    **Multi-value storage (tuple unpack):**
+    - A storage key with comma-separated names is a SINGLE function call that returns a tuple/list
+    - Preserve the comma-separated names AS-IS in storage_key — DO NOT split into multiple extraction steps
+    - DO NOT add extra extraction steps for individual values
+    - Example: "I call 'get_credentials' with env 'test' and store as 'username, password'"
+      → ONE function_call step: function_name: "get_credentials", parameters: {"env": "test"}, storage_key: "username, password"
+      → DO NOT generate separate "extract username" / "extract password" steps
+    
     **Parameter parsing:**
     - Parse parameter values to correct types: numbers as int/float, booleans as true/false, strings as strings
     - Preserve variable references using ${variable_name} syntax in parameter values

@@ -21,6 +21,6 @@ Feature: Multi-value function returns
     Then the gravity information should contain "${stats.gravity}"
 
   Scenario: Tuple return — positional unpack to separate variables
-    When I call 'get_credentials' with env "test" and store as "username, password"
-    Then I verify that "${username}" equals "testuser@example.com"
-    And I verify that "${password}" equals "test_pass_123"
+    When I call 'get_multi_value' with category "destination" and store as "dest_name, expected_gravity"
+    And I select "${dest_name}" from the destinations
+    Then the gravity information should contain "${expected_gravity}"
