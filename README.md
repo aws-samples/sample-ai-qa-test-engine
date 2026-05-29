@@ -595,6 +595,24 @@ my_functions/
 
 You can also set `CUSTOM_FUNCTIONS_FILE=./my_functions/` in `.env`.
 
+## Variable Storage & Resolution
+
+Variables come from multiple sources and are stored in a unified nested dictionary. Dotted keys create nested structures, ensuring input variables and extracted variables use the same path — no ambiguity.
+
+| Storage Pattern | Example | How Stored | How Read |
+|---|---|---|---|
+| Simple key | `store as "order_id"` | `variables["order_id"] = "ORD-123"` | `${order_id}` |
+| Dotted key | `store as "dealer.email"` | `variables["dealer"]["email"] = "x@y.com"` | `${dealer.email}` |
+| Tuple unpack | `store as "username, password"` | `variables["username"]`, `variables["password"]` | `${username}`, `${password}` |
+| Dict return | `store as "stats"` (func returns dict) | `variables["stats"] = {"gravity": "1.1g"}` | `${stats.gravity}` |
+| Input variables | `--variables-file` with `{"target": {"destination": "X"}}` | `variables["target"] = {"destination": "X"}` | `${target.destination}` |
+
+**Key behaviors:**
+- Extraction with a dotted key (e.g., `dealer.email`) overwrites the same path in input variables — single source of truth
+- Tuple unpack keys are always flat (no dot traversal)
+- Dict returns store the whole dict under the key — access fields via `${key.field}`
+- Resolution order: direct key lookup first, then dotted path traversal
+
 ## Trajectory Replay (Speed Up Repeated Runs)
 
 On first run, the engine records browser actions (clicks, scrolls) as trajectory JSON files. On subsequent runs, cached action steps replay without calling the AI model — saving time and API costs.

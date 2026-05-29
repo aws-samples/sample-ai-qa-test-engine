@@ -23,18 +23,39 @@ from ai_qa_test_engine.models import (
 from ai_qa_test_engine.trajectory import TrajectoryCache
 
 
+def store_variable(variables: dict, key: str, value: Any) -> None:
+    """Store a value in the variables dict, supporting dotted nested paths.
+
+    - Simple key ("order_id") → variables["order_id"] = value
+    - Dotted key ("dealer.email") → variables["dealer"]["email"] = value
+      (auto-creates intermediate dicts)
+    """
+    if "." not in key:
+        variables[key] = value
+        return
+
+    parts = key.split(".")
+    obj = variables
+    for part in parts[:-1]:
+        if part not in obj or not isinstance(obj[part], dict):
+            obj[part] = {}
+        obj = obj[part]
+    obj[parts[-1]] = value
+
+
 def substitute_variables(text: str, variables: dict) -> str:
     """Replace ${variable_name} references with actual values.
 
     Supports:
     - Simple: ${name} → variables["name"]
-    - Dotted (flat): ${stats.gravity} → variables["stats.gravity"] (from dict unpack)
     - Dotted (nested): ${user.name} → variables["user"]["name"]
+    - Dotted (nested from extraction): ${dealer.email} → variables["dealer"]["email"]
+    - Dict return: ${stats.gravity} → variables["stats"]["gravity"]
     - Array index: ${items.0.title} → variables["items"][0]["title"]
 
     Args:
         text: Text containing variable references
-        variables: Dictionary of extracted variables (flat or nested)
+        variables: Dictionary of extracted variables (nested)
 
     Returns:
         Text with all variable references replaced
@@ -50,7 +71,7 @@ def substitute_variables(text: str, variables: dict) -> str:
     def replacer(match):
         var_name = match.group(1)
 
-        # Direct lookup (handles flat keys like "stats.gravity" from dict unpack)
+        # Direct lookup (handles simple keys and legacy flat dotted keys)
         if var_name in variables:
             return str(variables[var_name])
 
@@ -333,14 +354,14 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
                 keys = [k.strip() for k in storage_key.split(",")]
                 if isinstance(result, (tuple, list)) and len(result) == len(keys):
                     for k, v in zip(keys, result):
-                        extracted_values[k] = v
+                        store_variable(extracted_values, k, v)
                     log(f"  → Stored as: {', '.join(keys)}")
                 else:
                     # Mismatch — store full result under first key, warn
-                    extracted_values[keys[0]] = result
+                    store_variable(extracted_values, keys[0], result)
                     log(f"  → Warning: expected {len(keys)} values but got {type(result).__name__}, stored under {keys[0]}")
             else:
-                extracted_values[storage_key] = result
+                store_variable(extracted_values, storage_key, result)
                 log(f"  → Stored as: {storage_key}")
 
         log(f"  → Result: {result}")
@@ -393,7 +414,7 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
         log(f"  → Store as: {extraction_key}")
 
         value = getattr(nova.expect(prompt), f"as_{extraction_type}")()
-        extracted_values[extraction_key] = value
+        store_variable(extracted_values, extraction_key, value)
         log(f"  → Extracted: {value}")
         return value
 
