@@ -140,32 +140,34 @@ if [ "$NETWORK_MODE" = "PRIVATE" ]; then
     echo ""
     echo "🌐 Creating VPC Browser for internal app testing..."
     ROLE_ARN_RESOLVED="${EXISTING_ROLE_ARN:-$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" --query 'Stacks[0].Outputs[?OutputKey==`ExecutionRoleArn`].OutputValue' --output text)}"
-    BROWSER_NAME="${STACK_NAME}-vpc-browser"
+    BROWSER_NAME="${STACK_NAME//-/_}_vpc_browser"
 
     # Check if browser already exists
-    EXISTING_BROWSER=$(aws bedrock-agentcore-control get-browser --name "$BROWSER_NAME" --region "$REGION" --query 'name' --output text 2>/dev/null || echo "")
+    EXISTING_BROWSER=$(aws bedrock-agentcore-control get-browser --browser-id "$BROWSER_NAME" --region "$REGION" --query 'name' --output text 2>/dev/null || echo "")
     if [ -n "$EXISTING_BROWSER" ] && [ "$EXISTING_BROWSER" != "None" ]; then
         echo "  ✓ VPC Browser already exists: $BROWSER_NAME"
     else
-        aws bedrock-agentcore-control create-browser \
+        BROWSER_RESULT=$(aws bedrock-agentcore-control create-browser \
             --name "$BROWSER_NAME" \
             --description "AI QA Test Engine — VPC Browser for internal app testing" \
-            --network-configuration "{\"networkMode\":\"VPC\",\"networkModeConfig\":{\"subnets\":[$(echo "$SUBNET_IDS" | sed 's/,/","/g' | sed 's/^/"/;s/$/"/')]},\"securityGroups\":[$(echo "$SECURITY_GROUP_IDS" | sed 's/,/","/g' | sed 's/^/"/;s/$/"/')]}}}" \
+            --network-configuration "{\"networkMode\":\"VPC\",\"vpcConfig\":{\"subnets\":[$(echo "$SUBNET_IDS" | sed 's/\([^,]*\)/"\1"/g' | sed 's/,/,/g')],\"securityGroups\":[$(echo "$SECURITY_GROUP_IDS" | sed 's/\([^,]*\)/"\1"/g' | sed 's/,/,/g')]}}" \
             --execution-role-arn "$ROLE_ARN_RESOLVED" \
             --region "$REGION" \
-            --output text --query 'name' > /dev/null 2>&1 && \
-            echo "  ✓ VPC Browser created: $BROWSER_NAME" || \
-            echo "  ⚠️  VPC Browser creation failed (may need manual setup)"
+            --query 'browserId' --output text 2>&1) && \
+            echo "  ✓ VPC Browser created: $BROWSER_RESULT" || \
+            echo "  ⚠️  VPC Browser creation failed: $BROWSER_RESULT"
+        BROWSER_NAME="${BROWSER_RESULT:-$BROWSER_NAME}"
     fi
 
     # Set BROWSER_IDENTIFIER env var on test runner
     RUNNER_ID=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" --query 'Stacks[0].Outputs[?OutputKey==`TestRunnerArn`].OutputValue' --output text | sed 's|.*/||')
     if [ -n "$RUNNER_ID" ]; then
         echo "  Setting BROWSER_IDENTIFIER=$BROWSER_NAME on test runner..."
+        RUNNER_ECR=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" --query 'Stacks[0].Outputs[?OutputKey==`TestRunnerECRUri`].OutputValue' --output text)
         aws bedrock-agentcore-control update-agent-runtime \
             --agent-runtime-id "$RUNNER_ID" \
-            --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" --query 'Stacks[0].Outputs[?OutputKey==`TestRunnerECRUri`].OutputValue' --output text):latest\"}}" \
-            --network-configuration "{\"networkMode\":\"VPC\",\"networkModeConfig\":{\"subnets\":[$(echo "$SUBNET_IDS" | sed 's/,/","/g' | sed 's/^/"/;s/$/"/')],\"securityGroups\":[$(echo "$SECURITY_GROUP_IDS" | sed 's/,/","/g' | sed 's/^/"/;s/$/"/')]}}" \
+            --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"${RUNNER_ECR}:latest\"}}" \
+            --network-configuration "{\"networkMode\":\"VPC\",\"networkModeConfig\":{\"subnets\":[$(echo "$SUBNET_IDS" | sed 's/\([^,]*\)/"\1"/g')],\"securityGroups\":[$(echo "$SECURITY_GROUP_IDS" | sed 's/\([^,]*\)/"\1"/g')]}}" \
             --environment-variables "{\"BROWSER_IDENTIFIER\":\"$BROWSER_NAME\"}" \
             --role-arn "$ROLE_ARN_RESOLVED" \
             --region "$REGION" \
