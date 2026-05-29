@@ -437,10 +437,13 @@ Resources:
         ContainerConfiguration:
           ContainerUri: !Sub '${TestRunnerECR.RepositoryUri}:latest'
       RoleArn: !If [CreateRole, !GetAtt AgentCoreExecutionRole.Arn, !Ref ExistingRoleArn]
-      NetworkConfiguration:
-        NetworkMode: !Ref NetworkMode
-        SubnetIds: !If [IsVPC, !Ref SubnetIds, !Ref 'AWS::NoValue']
-        SecurityGroupIds: !If [IsVPC, !Ref SecurityGroupIds, !Ref 'AWS::NoValue']
+      NetworkConfiguration: !If
+        - IsVPC
+        - NetworkMode: VPC
+          NetworkModeConfig:
+            Subnets: !Ref SubnetIds
+            SecurityGroups: !Ref SecurityGroupIds
+        - NetworkMode: PUBLIC
       Description: 'AI QA Test Engine — Test Runner'
 
   OrchestratorRuntime:
@@ -454,10 +457,13 @@ Resources:
         ContainerConfiguration:
           ContainerUri: !Sub '${OrchestratorECR.RepositoryUri}:latest'
       RoleArn: !If [CreateRole, !GetAtt AgentCoreExecutionRole.Arn, !Ref ExistingRoleArn]
-      NetworkConfiguration:
-        NetworkMode: !Ref NetworkMode
-        SubnetIds: !If [IsVPC, !Ref SubnetIds, !Ref 'AWS::NoValue']
-        SecurityGroupIds: !If [IsVPC, !Ref SecurityGroupIds, !Ref 'AWS::NoValue']
+      NetworkConfiguration: !If
+        - IsVPC
+        - NetworkMode: VPC
+          NetworkModeConfig:
+            Subnets: !Ref SubnetIds
+            SecurityGroups: !Ref SecurityGroupIds
+        - NetworkMode: PUBLIC
       Description: 'AI QA Test Engine — Orchestrator'
       EnvironmentVariables:
         TEST_RUNNER_ARN: !GetAtt TestRunnerRuntime.AgentRuntimeArn
