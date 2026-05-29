@@ -50,7 +50,11 @@
         "Sid": "NovaAct",
         "Effect": "Allow",
         "Action": [
-          "nova-act:*"
+          "nova-act:CreateWorkflowDefinition",
+          "nova-act:GetWorkflowDefinition",
+          "nova-act:CreateWorkflowRun",
+          "nova-act:CreateSession",
+          "nova-act:CreateAct"
         ],
         "Resource": "*"
       },

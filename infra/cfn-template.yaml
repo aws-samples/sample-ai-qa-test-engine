@@ -132,7 +132,12 @@ Resources:
                 Resource: !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:runtime/*'
               - Sid: NovaAct
                 Effect: Allow
-                Action: ['nova-act:*']
+                Action:
+                  - nova-act:CreateWorkflowDefinition
+                  - nova-act:GetWorkflowDefinition
+                  - nova-act:CreateWorkflowRun
+                  - nova-act:CreateSession
+                  - nova-act:CreateAct
                 Resource: '*'
               - Sid: Browser
                 Effect: Allow
