@@ -1,4 +1,4 @@
-@NextDotGym
+@NextDotGym @negative-test
 Feature: Intentional Failure Test
   This test has a step that will fail to demonstrate --stop-on-failure
 

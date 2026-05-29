@@ -22,6 +22,7 @@ def execute_scenario_agentcore(
     base_url: str,
     feature_name: str,
     functions_file: Optional[Path] = None,
+    input_variables: Optional[dict] = None,
 ) -> dict:
     """Execute a single test scenario using ai-qa-test-engine with AgentCore browser.
 
@@ -30,6 +31,7 @@ def execute_scenario_agentcore(
         base_url: Starting URL for the test
         feature_name: Name of the parent feature
         functions_file: Optional path to custom functions .py file
+        input_variables: Optional dict of pre-loaded variables (from variables/ S3 dir)
 
     Returns:
         Result dict with status, duration, steps, errors
@@ -85,6 +87,10 @@ def execute_scenario_agentcore(
     )
 
     extracted_values = {}
+    # Pre-load input variables (from variables/ S3 directory)
+    if input_variables:
+        extracted_values.update(input_variables)
+        log_callback(f"Pre-loaded {len(input_variables)} input variable(s): {list(input_variables.keys())}")
     step_results = []
     errors = []
 

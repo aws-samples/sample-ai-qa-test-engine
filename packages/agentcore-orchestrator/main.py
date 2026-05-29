@@ -131,17 +131,46 @@ def handler(payload):
         # Step 4: Load translated features and decompose into scenarios
         features = _load_translated(input_bucket, cache_status, download_string)
 
-        # Check for custom functions
+        # Check for custom functions (try known paths, then search recursively)
         custom_functions_s3 = None
-        custom_funcs_key = f"{input_prefix}custom-functions/custom_functions.py"
-        try:
-            if get_last_modified(input_bucket, custom_funcs_key):
-                custom_functions_s3 = {"bucket": input_bucket, "key": custom_funcs_key}
-                logger.info(f"Custom functions found: {custom_funcs_key}")
-        except Exception:
-            pass
+        custom_funcs_candidates = [
+            f"{input_prefix}custom-functions/custom_functions.py",
+            f"{input_prefix}custom_functions.py",
+        ]
+        for candidate_key in custom_funcs_candidates:
+            try:
+                if get_last_modified(input_bucket, candidate_key):
+                    custom_functions_s3 = {"bucket": input_bucket, "key": candidate_key}
+                    logger.info(f"Custom functions found: {candidate_key}")
+                    break
+            except Exception:
+                continue
 
-        scenarios = _decompose(features, run_id, custom_functions_s3, output_bucket, output_prefix, tag_filter)
+        # Fallback: search recursively for any custom_functions.py
+        if not custom_functions_s3:
+            py_files = list_objects(input_bucket, input_prefix, suffix="custom_functions.py")
+            if py_files:
+                custom_functions_s3 = {"bucket": input_bucket, "key": py_files[0]["key"]}
+                logger.info(f"Custom functions found (recursive): {py_files[0]['key']}")
+
+        # Check for input variables directory
+        input_variables_s3 = None
+        variables_prefix = f"{input_prefix}variables/"
+        var_files = list_objects(input_bucket, variables_prefix, suffix=".json")
+        if var_files:
+            input_variables_s3 = {"bucket": input_bucket, "prefix": variables_prefix}
+            logger.info(f"Input variables found: {len(var_files)} file(s) in {variables_prefix}")
+        else:
+            # Fallback: check for single variables.json at root
+            vars_key = f"{input_prefix}variables.json"
+            try:
+                if get_last_modified(input_bucket, vars_key):
+                    input_variables_s3 = {"bucket": input_bucket, "key": vars_key}
+                    logger.info(f"Input variables found: {vars_key}")
+            except Exception:
+                pass
+
+        scenarios = _decompose(features, run_id, custom_functions_s3, input_variables_s3, output_bucket, output_prefix, tag_filter)
         logger.info(f"Total scenarios to execute: {len(scenarios)}")
 
         # Step 5: Fan out parallel invocations
@@ -360,7 +389,7 @@ def _load_translated(bucket, cache_status, download_string):
     return features
 
 
-def _decompose(features, run_id, custom_functions_s3, output_bucket, output_prefix, tag_filter=None):
+def _decompose(features, run_id, custom_functions_s3, input_variables_s3, output_bucket, output_prefix, tag_filter=None):
     """Break features into individual scenario payloads."""
     import re
     payloads = []
@@ -392,6 +421,10 @@ def _decompose(features, run_id, custom_functions_s3, output_bucket, output_pref
 
             if custom_functions_s3:
                 payload["custom_functions_s3"] = custom_functions_s3
+
+            if input_variables_s3:
+                payload["input_variables_s3"] = input_variables_s3
+                payload["scenario_id_for_vars"] = scenario_id
 
             payload["output_s3"] = {
                 "bucket": output_bucket,

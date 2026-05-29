@@ -56,4 +56,4 @@ Feature: Trajectory replay caching
     Then I should see a list of available destinations
     When I select "TRAPPIST-1e" from the destinations @no-cache
     Then I should see the destination name "TRAPPIST-1e"
-    And the starting price should show "1200K"
+    And the starting price should show "1200 K"

@@ -209,7 +209,7 @@ for o in outputs:
             --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"${RUNNER_ECR}:latest\"}}" \
             --network-configuration '{"networkMode":"PUBLIC"}' \
             --lifecycle-configuration "{\"idleRuntimeSessionTimeout\":${IDLE_SESSION_TIMEOUT},\"maxLifetime\":${MAX_LIFETIME}}" \
-            "${ENV_ARGS[@]}" \
+            ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} \
             --role-arn "$ROLE_ARN" \
             --region "$REGION" \
             --output text --query 'agentRuntimeArn' > /dev/null
@@ -245,7 +245,7 @@ for o in outputs:
             --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"${ORCHESTRATOR_ECR}:latest\"}}" \
             --network-configuration '{"networkMode":"PUBLIC"}' \
             --lifecycle-configuration "{\"idleRuntimeSessionTimeout\":${IDLE_SESSION_TIMEOUT},\"maxLifetime\":${MAX_LIFETIME}}" \
-            "${ENV_ARGS[@]}" \
+            ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} \
             --role-arn "$ROLE_ARN" \
             --region "$REGION" \
             --output text --query 'agentRuntimeArn' > /dev/null

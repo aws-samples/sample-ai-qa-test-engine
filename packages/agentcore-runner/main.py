@@ -161,6 +161,8 @@ def _handle_execute(payload):
     feature_name = payload.get("feature_name", "unknown_feature")
     scenario_name = payload.get("scenario_name", "unknown_scenario")
     custom_functions_s3 = payload.get("custom_functions_s3")
+    input_variables_s3 = payload.get("input_variables_s3")
+    scenario_id_for_vars = payload.get("scenario_id_for_vars")
     output_s3 = payload.get("output_s3")
     run_id = payload.get("run_id", "manual")
 
@@ -183,12 +185,20 @@ def _handle_execute(payload):
         functions_path = download_file(bucket, key, local_path)
         logger.info(f"Custom functions downloaded: {functions_path}")
 
+    # Load input variables from S3 if specified
+    input_variables = {}
+    if input_variables_s3:
+        input_variables = _load_input_variables(input_variables_s3, scenario_id_for_vars, feature_name)
+        if input_variables:
+            logger.info(f"Input variables loaded: {list(input_variables.keys())}")
+
     # Execute scenario
     result = execute_scenario_agentcore(
         scenario_data=scenario_data,
         base_url=base_url,
         feature_name=feature_name,
         functions_file=Path(functions_path) if functions_path else None,
+        input_variables=input_variables,
     )
 
     # Add metadata
@@ -226,6 +236,72 @@ def _handle_execute(payload):
 
     logger.info(f"Scenario complete: {result['status']}")
     return result
+
+
+def _load_input_variables(input_variables_s3: dict, scenario_id: str, feature_name: str) -> dict:
+    """Load input variables from S3 for a specific scenario.
+
+    Supports two layouts:
+    1. Directory with per-scenario files: variables/_global.json + variables/<scenario_id>.json
+    2. Single file: variables.json (flat dict applied to all scenarios)
+
+    Merge order: _global.json + <feature_name>.json + <scenario_id>.json (most specific wins)
+    """
+    from s3_utils import download_file
+    import json as _json
+
+    variables = {}
+
+    if "prefix" in input_variables_s3:
+        # Directory layout: download _global.json + scenario-specific file
+        bucket = input_variables_s3["bucket"]
+        prefix = input_variables_s3["prefix"]
+
+        # Load _global.json
+        try:
+            global_path = f"/tmp/vars_global_{scenario_id}.json"
+            download_file(bucket, f"{prefix}_global.json", global_path)
+            with open(global_path) as f:
+                variables.update(_json.load(f))
+            os.remove(global_path)
+        except Exception:
+            pass
+
+        # Load feature-level file
+        try:
+            feat_path = f"/tmp/vars_feat_{scenario_id}.json"
+            download_file(bucket, f"{prefix}{feature_name}.json", feat_path)
+            with open(feat_path) as f:
+                variables.update(_json.load(f))
+            os.remove(feat_path)
+        except Exception:
+            pass
+
+        # Load scenario-specific file
+        if scenario_id:
+            try:
+                scen_path = f"/tmp/vars_scen_{scenario_id}.json"
+                download_file(bucket, f"{prefix}{scenario_id}.json", scen_path)
+                with open(scen_path) as f:
+                    variables.update(_json.load(f))
+                os.remove(scen_path)
+            except Exception:
+                pass
+
+    elif "key" in input_variables_s3:
+        # Single file layout: download and apply to all
+        bucket = input_variables_s3["bucket"]
+        key = input_variables_s3["key"]
+        try:
+            local_path = f"/tmp/vars_{scenario_id}.json"
+            download_file(bucket, key, local_path)
+            with open(local_path) as f:
+                variables = _json.load(f)
+            os.remove(local_path)
+        except Exception:
+            pass
+
+    return variables
 
 
 if __name__ == "__main__":
