@@ -127,10 +127,10 @@ class TestScenario(BaseModel):
                     var_name = match.group(1)
                     if var_name in defined_variables:
                         continue
-                    # Check for dotted reference (dict unpack): ${stats.gravity} → "stats.*" in set
+                    # Check dotted reference: ${stats.gravity} is valid if "stats" is defined
                     if "." in var_name:
                         base_name = var_name.split(".")[0]
-                        if f"{base_name}.*" in defined_variables or base_name in defined_variables:
+                        if base_name in defined_variables:
                             continue
                     # Allow — may come from input_variables, env, or runtime context
 
@@ -145,8 +145,6 @@ class TestScenario(BaseModel):
                         defined_variables.add(k.strip())
                 else:
                     defined_variables.add(storage_key)
-                    # Dict return auto-unpacks to storage_key.field — allow any dotted reference
-                    defined_variables.add(f"{storage_key}.*")
 
         return self
 
