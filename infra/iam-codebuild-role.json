@@ -1,0 +1,54 @@
+{
+  "Description": "IAM role for CodeBuild to build Docker images. Admin creates this role and passes the ARN via --codebuild-role-arn.",
+  "TrustPolicy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "codebuild.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+      }
+    ]
+  },
+  "PermissionsPolicy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "CloudWatchLogs",
+        "Effect": "Allow",
+        "Action": [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        "Resource": "arn:aws:logs:*:*:log-group:/aws/codebuild/*"
+      },
+      {
+        "Sid": "ECRPush",
+        "Effect": "Allow",
+        "Action": [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:GetAuthorizationToken",
+          "ecr:PutImage",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload"
+        ],
+        "Resource": "*"
+      },
+      {
+        "Sid": "S3ReadSource",
+        "Effect": "Allow",
+        "Action": [
+          "s3:GetObject",
+          "s3:ListBucket"
+        ],
+        "Resource": "*"
+      }
+    ]
+  }
+}

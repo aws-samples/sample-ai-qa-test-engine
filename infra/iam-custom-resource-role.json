@@ -1,0 +1,33 @@
+{
+  "Description": "IAM role for the Lambda custom resource that triggers CodeBuild during CFN deployment. Admin creates this role and passes the ARN via --custom-resource-role-arn.",
+  "TrustPolicy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "lambda.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+      }
+    ]
+  },
+  "ManagedPolicyArns": [
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  ],
+  "PermissionsPolicy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "CodeBuildTrigger",
+        "Effect": "Allow",
+        "Action": [
+          "codebuild:StartBuild",
+          "codebuild:BatchGetBuilds",
+          "codebuild:BatchGetProjects"
+        ],
+        "Resource": "arn:aws:codebuild:*:*:project/ai-qa-test-engine-*"
+      }
+    ]
+  }
+}

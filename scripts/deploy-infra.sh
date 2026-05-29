@@ -26,22 +26,32 @@ STACK_NAME="${STACK_NAME:-ai-qa-test-engine}"
 REGION="${AWS_REGION:-us-east-1}"
 EXISTING_ROLE_ARN=""
 EXISTING_TEST_BUCKET=""
+EXISTING_CODEBUILD_ROLE_ARN=""
+EXISTING_CUSTOM_RESOURCE_ROLE_ARN=""
+DEPLOY_BUCKET_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --stack-name) STACK_NAME="$2"; shift 2 ;;
         --region) REGION="$2"; shift 2 ;;
         --role-arn) EXISTING_ROLE_ARN="$2"; shift 2 ;;
+        --codebuild-role-arn) EXISTING_CODEBUILD_ROLE_ARN="$2"; shift 2 ;;
+        --custom-resource-role-arn) EXISTING_CUSTOM_RESOURCE_ROLE_ARN="$2"; shift 2 ;;
         --test-bucket) EXISTING_TEST_BUCKET="$2"; shift 2 ;;
+        --deploy-bucket) DEPLOY_BUCKET_OVERRIDE="$2"; shift 2 ;;
         --help)
             echo "Usage: ./scripts/deploy-infra.sh [options]"
             echo ""
             echo "Options:"
-            echo "  --stack-name NAME     CFN stack name (default: ai-qa-test-engine)"
-            echo "  --region REGION       AWS region (default: us-east-1)"
-            echo "  --role-arn ARN        Pre-created IAM role ARN (skip role creation)"
-            echo "  --test-bucket NAME    Pre-created S3 bucket name (skip bucket creation)"
+            echo "  --stack-name NAME              CFN stack name (default: ai-qa-test-engine)"
+            echo "  --region REGION                AWS region (default: us-east-1)"
+            echo "  --role-arn ARN                 Pre-created AgentCore execution role (skip creation)"
+            echo "  --codebuild-role-arn ARN       Pre-created CodeBuild role (skip creation)"
+            echo "  --custom-resource-role-arn ARN Pre-created Custom Resource Lambda role (skip creation)"
+            echo "  --test-bucket NAME             Pre-created S3 bucket for test I/O (skip creation)"
+            echo "  --deploy-bucket NAME           Pre-created S3 bucket for source uploads"
             echo ""
+            echo "When all three role ARNs are provided, CAPABILITY_NAMED_IAM is not required."
             echo "This script deploys the full infrastructure stack via CloudFormation."
             echo "Run ONCE or when infra changes. For code updates, use update-agent.sh."
             exit 0 ;;
@@ -60,7 +70,7 @@ echo "  Method:  CloudFormation + CodeBuild"
 echo ""
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-DEPLOY_BUCKET="${STACK_NAME}-deploy-${ACCOUNT_ID}-${REGION}"
+DEPLOY_BUCKET="${DEPLOY_BUCKET_OVERRIDE:-${STACK_NAME}-deploy-${ACCOUNT_ID}-${REGION}}"
 
 # Create deploy bucket for source uploads
 echo "📦 Preparing deploy bucket: s3://${DEPLOY_BUCKET}"
@@ -83,7 +93,15 @@ echo "  ✓ Source uploaded to s3://${DEPLOY_BUCKET}/source/"
 # Build CFN parameters
 CFN_PARAMS="ProjectName=$STACK_NAME SourceBucket=$DEPLOY_BUCKET"
 [ -n "$EXISTING_ROLE_ARN" ] && CFN_PARAMS="$CFN_PARAMS ExistingRoleArn=$EXISTING_ROLE_ARN"
+[ -n "$EXISTING_CODEBUILD_ROLE_ARN" ] && CFN_PARAMS="$CFN_PARAMS ExistingCodeBuildRoleArn=$EXISTING_CODEBUILD_ROLE_ARN"
+[ -n "$EXISTING_CUSTOM_RESOURCE_ROLE_ARN" ] && CFN_PARAMS="$CFN_PARAMS ExistingCustomResourceRoleArn=$EXISTING_CUSTOM_RESOURCE_ROLE_ARN"
 [ -n "$EXISTING_TEST_BUCKET" ] && CFN_PARAMS="$CFN_PARAMS TestBucket=$EXISTING_TEST_BUCKET"
+
+# Determine if CAPABILITY_NAMED_IAM is needed (only when creating roles)
+CFN_CAPABILITIES=""
+if [ -z "$EXISTING_ROLE_ARN" ] || [ -z "$EXISTING_CODEBUILD_ROLE_ARN" ] || [ -z "$EXISTING_CUSTOM_RESOURCE_ROLE_ARN" ]; then
+    CFN_CAPABILITIES="--capabilities CAPABILITY_NAMED_IAM"
+fi
 
 # Deploy CloudFormation stack
 cd "$PROJECT_ROOT"
@@ -93,7 +111,7 @@ aws cloudformation deploy \
     --template-file "$PROJECT_ROOT/infra/cfn-template.yaml" \
     --stack-name "$STACK_NAME" \
     --region "$REGION" \
-    --capabilities CAPABILITY_NAMED_IAM \
+    $CFN_CAPABILITIES \
     --parameter-overrides $CFN_PARAMS \
     --no-fail-on-empty-changeset
 

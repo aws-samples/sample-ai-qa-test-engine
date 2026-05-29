@@ -20,7 +20,17 @@ Parameters:
   ExistingRoleArn:
     Type: String
     Default: ''
-    Description: (Optional) Pre-created IAM role ARN
+    Description: (Optional) Pre-created AgentCore execution role ARN
+
+  ExistingCodeBuildRoleArn:
+    Type: String
+    Default: ''
+    Description: (Optional) Pre-created CodeBuild role ARN
+
+  ExistingCustomResourceRoleArn:
+    Type: String
+    Default: ''
+    Description: (Optional) Pre-created Custom Resource Lambda role ARN
 
   SourceBucket:
     Type: String
@@ -30,6 +40,8 @@ Parameters:
 Conditions:
   CreateBucket: !Equals [!Ref TestBucket, '']
   CreateRole: !Equals [!Ref ExistingRoleArn, '']
+  CreateCodeBuildRole: !Equals [!Ref ExistingCodeBuildRoleArn, '']
+  CreateCustomResourceRole: !Equals [!Ref ExistingCustomResourceRoleArn, '']
 
 Resources:
   # ============================================================
@@ -137,6 +149,7 @@ Resources:
   # ============================================================
   CodeBuildRole:
     Type: AWS::IAM::Role
+    Condition: CreateCodeBuildRole
     Properties:
       RoleName: !Sub '${ProjectName}-codebuild-role'
       AssumeRolePolicyDocument:
@@ -166,6 +179,7 @@ Resources:
   # ============================================================
   CustomResourceRole:
     Type: AWS::IAM::Role
+    Condition: CreateCustomResourceRole
     Properties:
       RoleName: !Sub '${ProjectName}-custom-resource-role'
       AssumeRolePolicyDocument:
@@ -194,7 +208,7 @@ Resources:
     Properties:
       FunctionName: !Sub '${ProjectName}-codebuild-trigger'
       Handler: index.handler
-      Role: !GetAtt CustomResourceRole.Arn
+      Role: !If [CreateCustomResourceRole, !GetAtt CustomResourceRole.Arn, !Ref ExistingCustomResourceRoleArn]
       Runtime: python3.11
       Timeout: 900
       Code:
@@ -244,7 +258,7 @@ Resources:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Sub '${ProjectName}-test-runner-build'
-      ServiceRole: !GetAtt CodeBuildRole.Arn
+      ServiceRole: !If [CreateCodeBuildRole, !GetAtt CodeBuildRole.Arn, !Ref ExistingCodeBuildRoleArn]
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
@@ -318,7 +332,7 @@ Resources:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Sub '${ProjectName}-orchestrator-build'
-      ServiceRole: !GetAtt CodeBuildRole.Arn
+      ServiceRole: !If [CreateCodeBuildRole, !GetAtt CodeBuildRole.Arn, !Ref ExistingCodeBuildRoleArn]
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
