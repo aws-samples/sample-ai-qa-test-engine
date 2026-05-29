@@ -48,11 +48,36 @@ These prompts will be executed by Nova Act's AI model to interact with a browser
 
 TEMPLATE VARIABLES:
 
-- Use ${extraction_key} syntax to reference previously extracted values
+- Use ${variable_name} syntax to reference variables — these come from TWO sources:
+  1. Previously extracted values (from extraction steps earlier in the scenario)
+  2. Pre-loaded input variables (from --variables-file JSON, available at runtime)
+- CRITICAL: Always preserve ${variable_name} references EXACTLY as written in the Gherkin step
 - IMPORTANT: Always preserve the dollar sign ($) - use ${variable_name}, NOT {variable_name}
 - Works in both instruction prompts and validation expected values
+- Dotted notation is supported: ${target.destination}, ${user.email}, ${config.timeout}
 - Example: "Enter ${order_id} in the tracking field"
 - Example: expected value could be "Order ${order_id} confirmed"
+- Example: "Click the '${target.destination}' destination card" — preserve the variable reference!
+
+INPUT VARIABLES (pre-loaded from JSON):
+
+When a Gherkin step contains ${variable_name} references, these may be pre-loaded input variables
+that are resolved at runtime (not from prior extraction steps). You MUST:
+- Preserve them exactly as-is in instruction prompts, extraction prompts, and validation expected values
+- Never replace them with literal values or generic descriptions
+- Never convert a validation with ${var} into a boolean check — keep it as an equality/contains check with ${var} as expected
+
+Example:
+```
+Then I should see the destination name "${target.destination}"
+→ validation: prompt "The destination name", comparison "equal", expected "${target.destination}"
+```
+
+WRONG:
+```
+Then I should see the destination name "${target.destination}"
+→ validation: prompt "The destination name 'Proxima Centauri b' is displayed", comparison "true"
+```
 
 FUNCTION CALL STEPS - Recognize and parse custom function calls:
     
@@ -158,8 +183,14 @@ Given I am on the home page
 When I click the "Proxima Centauri b" destination card
 → instruction: "Click the 'Proxima Centauri b' destination card"
 
+When I select "${target.destination}" from the destinations
+→ instruction: "Select '${target.destination}' from the destinations"
+
 Then I should see the destination name "Proxima Centauri b"
 → validation: prompt "The destination name", exact match, expected "Proxima Centauri b"
+
+Then I should see the destination name "${target.destination}"
+→ validation: prompt "The destination name", exact match, expected "${target.destination}"
 
 And the mass information should be displayed
 → validation: prompt "The mass information is displayed", boolean true
