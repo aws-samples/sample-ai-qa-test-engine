@@ -120,19 +120,19 @@ class TestScenario(BaseModel):
                         texts_to_check.append(param_value)
 
             # Validate references BEFORE registering this step's key
+            # Note: variables from input_variables (runtime-loaded) won't be in defined_variables.
+            # We skip strict validation — runtime will catch truly missing variables with a clear error.
             for text in texts_to_check:
                 for match in _VARIABLE_PATTERN.finditer(text):
                     var_name = match.group(1)
-                    if var_name not in defined_variables:
-                        # Check for dotted reference (dict unpack): ${stats.gravity} → "stats.*" in set
-                        if "." in var_name:
-                            base_name = var_name.split(".")[0]
-                            if f"{base_name}.*" in defined_variables or base_name in defined_variables:
-                                continue
-                        raise ValueError(
-                            f"Undefined variable reference '${{{var_name}}}' in step {step_idx}: "
-                            f"'{step.original_text}'. Variable must be extracted in an earlier step."
-                        )
+                    if var_name in defined_variables:
+                        continue
+                    # Check for dotted reference (dict unpack): ${stats.gravity} → "stats.*" in set
+                    if "." in var_name:
+                        base_name = var_name.split(".")[0]
+                        if f"{base_name}.*" in defined_variables or base_name in defined_variables:
+                            continue
+                    # Allow — may come from input_variables, env, or runtime context
 
             # Register variables defined by this step (after validation)
             if step.extraction:

@@ -1,5 +1,6 @@
 {
-  "target_destination": "Proxima Centauri b",
-  "expected_gravity": "1.1g",
-  "expected_distance": "4.24 light-years"
+  "target": {
+    "destination": "Proxima Centauri b",
+    "expected_gravity": "1.1g"
+  }
 }
