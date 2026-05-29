@@ -28,11 +28,15 @@ from ai_qa_test_engine.trajectory import TrajectoryCache
 def substitute_variables(text: str, variables: dict) -> str:
     """Replace ${variable_name} references with actual values.
 
-    Ported as-is from test_translator/utils/execution.py.
+    Supports:
+    - Simple: ${name} → variables["name"]
+    - Dotted (flat): ${stats.gravity} → variables["stats.gravity"] (from dict unpack)
+    - Dotted (nested): ${user.name} → variables["user"]["name"]
+    - Array index: ${items.0.title} → variables["items"][0]["title"]
 
     Args:
         text: Text containing variable references
-        variables: Dictionary of extracted variables
+        variables: Dictionary of extracted variables (flat or nested)
 
     Returns:
         Text with all variable references replaced
@@ -47,9 +51,29 @@ def substitute_variables(text: str, variables: dict) -> str:
 
     def replacer(match):
         var_name = match.group(1)
-        if var_name not in variables:
-            raise KeyError(f"Variable '${{{var_name}}}' not found in context")
-        return str(variables[var_name])
+
+        # Direct lookup (handles flat keys like "stats.gravity" from dict unpack)
+        if var_name in variables:
+            return str(variables[var_name])
+
+        # Dotted path traversal for nested objects/arrays
+        if "." in var_name:
+            parts = var_name.split(".")
+            obj = variables.get(parts[0])
+            if obj is not None:
+                for part in parts[1:]:
+                    if isinstance(obj, dict):
+                        obj = obj.get(part)
+                    elif isinstance(obj, (list, tuple)) and part.isdigit():
+                        idx = int(part)
+                        obj = obj[idx] if idx < len(obj) else None
+                    else:
+                        obj = None
+                        break
+                if obj is not None:
+                    return str(obj)
+
+        raise KeyError(f"Variable '${{{var_name}}}' not found in context")
 
     return re.sub(pattern, replacer, text)
 
