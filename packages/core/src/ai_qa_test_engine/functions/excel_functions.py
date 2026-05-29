@@ -32,6 +32,13 @@ def load_excel_data(file: str, sheet: str, row: int = 1, context: dict = None) -
     if not file_path.is_absolute():
         file_path = Path.cwd() / file_path
 
+    # Fallback: if full relative path doesn't exist, try just the filename
+    # (handles AgentCore mode where files are downloaded flat to a temp dir)
+    if not file_path.exists():
+        basename_path = Path.cwd() / Path(file).name
+        if basename_path.exists():
+            file_path = basename_path
+
     data = read_excel_data(file_path, sheet, row=row)
     return data
 

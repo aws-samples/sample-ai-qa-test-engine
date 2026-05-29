@@ -192,6 +192,14 @@ def _handle_execute(payload):
         if input_variables:
             logger.info(f"Input variables loaded: {list(input_variables.keys())}")
 
+    # Download data files (Excel, CSV) from S3 if specified
+    data_files_s3 = payload.get("data_files_s3")
+    data_dir = None
+    if data_files_s3:
+        data_dir = _download_data_files(data_files_s3)
+        if data_dir:
+            logger.info(f"Data files downloaded to: {data_dir}")
+
     # Execute scenario
     result = execute_scenario_agentcore(
         scenario_data=scenario_data,
@@ -199,6 +207,7 @@ def _handle_execute(payload):
         feature_name=feature_name,
         functions_file=Path(functions_path) if functions_path else None,
         input_variables=input_variables,
+        data_dir=Path(data_dir) if data_dir else None,
     )
 
     # Add metadata
@@ -236,6 +245,32 @@ def _handle_execute(payload):
 
     logger.info(f"Scenario complete: {result['status']}")
     return result
+
+
+def _download_data_files(data_files_s3: dict) -> str:
+    """Download data files (Excel, CSV) from S3 to a local temp directory.
+
+    Returns the local directory path where files were downloaded.
+    The scenario executor should use this as the working directory for
+    resolving relative file paths (e.g., 'TestData.xlsx').
+    """
+    from s3_utils import download_file
+    import tempfile
+
+    data_dir = tempfile.mkdtemp(prefix="data_files_")
+    bucket = data_files_s3["bucket"]
+
+    for file_info in data_files_s3.get("files", []):
+        key = file_info["key"]
+        filename = file_info["filename"]
+        local_path = os.path.join(data_dir, filename)
+        try:
+            download_file(bucket, key, local_path)
+            logger.info(f"  Downloaded: {filename}")
+        except Exception as e:
+            logger.warning(f"  Failed to download {filename}: {e}")
+
+    return data_dir
 
 
 def _load_input_variables(input_variables_s3: dict, scenario_id: str, feature_name: str) -> dict:

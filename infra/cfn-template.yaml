@@ -127,6 +127,10 @@ Resources:
                 Effect: Allow
                 Action: [xray:PutTraceSegments, xray:PutTelemetryRecords, xray:GetSamplingRules, xray:GetSamplingTargets]
                 Resource: '*'
+              - Sid: SecretsManager
+                Effect: Allow
+                Action: [secretsmanager:GetSecretValue]
+                Resource: '*'
 
   # ============================================================
   # IAM — CodeBuild Role

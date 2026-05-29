@@ -23,6 +23,7 @@ def execute_scenario_agentcore(
     feature_name: str,
     functions_file: Optional[Path] = None,
     input_variables: Optional[dict] = None,
+    data_dir: Optional[Path] = None,
 ) -> dict:
     """Execute a single test scenario using ai-qa-test-engine with AgentCore browser.
 
@@ -32,6 +33,7 @@ def execute_scenario_agentcore(
         feature_name: Name of the parent feature
         functions_file: Optional path to custom functions .py file
         input_variables: Optional dict of pre-loaded variables (from variables/ S3 dir)
+        data_dir: Optional path to directory containing data files (Excel, CSV) downloaded from S3
 
     Returns:
         Result dict with status, duration, steps, errors
@@ -93,6 +95,12 @@ def execute_scenario_agentcore(
         log_callback(f"Pre-loaded {len(input_variables)} input variable(s): {list(input_variables.keys())}")
     step_results = []
     errors = []
+
+    # Set working directory to data_dir so relative file paths (Excel, CSV) resolve
+    original_cwd = os.getcwd()
+    if data_dir and data_dir.exists():
+        os.chdir(data_dir)
+        log_callback(f"Working directory set to: {data_dir}")
 
     try:
         # Get AgentCore browser session (CDP connection to remote browser)
@@ -166,6 +174,10 @@ def execute_scenario_agentcore(
     except Exception as e:
         errors.append(f"Browser session error: {type(e).__name__}: {e}")
         logger.error(f"Browser session error: {e}")
+    finally:
+        # Restore original working directory
+        if data_dir:
+            os.chdir(original_cwd)
 
     duration = time.time() - start_time
 

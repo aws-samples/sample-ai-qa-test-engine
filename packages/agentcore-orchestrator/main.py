@@ -170,7 +170,20 @@ def handler(payload):
             except Exception:
                 pass
 
-        scenarios = _decompose(features, run_id, custom_functions_s3, input_variables_s3, output_bucket, output_prefix, tag_filter)
+        # Check for data files (Excel, JSON, etc.) — pass S3 prefix so runner can download
+        data_files_s3 = None
+        data_file_extensions = [".xlsx", ".xls", ".csv"]
+        all_data_files = []
+        for ext in data_file_extensions:
+            all_data_files.extend(list_objects(input_bucket, input_prefix, suffix=ext))
+        if all_data_files:
+            data_files_s3 = {
+                "bucket": input_bucket,
+                "files": [{"key": f["key"], "filename": os.path.basename(f["key"])} for f in all_data_files],
+            }
+            logger.info(f"Data files found: {[f['filename'] for f in data_files_s3['files']]}")
+
+        scenarios = _decompose(features, run_id, custom_functions_s3, input_variables_s3, data_files_s3, output_bucket, output_prefix, tag_filter)
         logger.info(f"Total scenarios to execute: {len(scenarios)}")
 
         # Step 5: Fan out parallel invocations
@@ -389,7 +402,7 @@ def _load_translated(bucket, cache_status, download_string):
     return features
 
 
-def _decompose(features, run_id, custom_functions_s3, input_variables_s3, output_bucket, output_prefix, tag_filter=None):
+def _decompose(features, run_id, custom_functions_s3, input_variables_s3, data_files_s3, output_bucket, output_prefix, tag_filter=None):
     """Break features into individual scenario payloads."""
     import re
     payloads = []
@@ -425,6 +438,9 @@ def _decompose(features, run_id, custom_functions_s3, input_variables_s3, output
             if input_variables_s3:
                 payload["input_variables_s3"] = input_variables_s3
                 payload["scenario_id_for_vars"] = scenario_id
+
+            if data_files_s3:
+                payload["data_files_s3"] = data_files_s3
 
             payload["output_s3"] = {
                 "bucket": output_bucket,
