@@ -37,11 +37,22 @@ Parameters:
     Default: ''
     Description: S3 bucket containing agent source zips (set by deploy.sh)
 
+  SubnetIds:
+    Type: CommaDelimitedList
+    Default: ''
+    Description: (VPC mode only) Comma-separated private subnet IDs
+
+  SecurityGroupIds:
+    Type: CommaDelimitedList
+    Default: ''
+    Description: (VPC mode only) Comma-separated security group IDs
+
 Conditions:
   CreateBucket: !Equals [!Ref TestBucket, '']
   CreateRole: !Equals [!Ref ExistingRoleArn, '']
   CreateCodeBuildRole: !Equals [!Ref ExistingCodeBuildRoleArn, '']
   CreateCustomResourceRole: !Equals [!Ref ExistingCustomResourceRoleArn, '']
+  IsVPC: !Equals [!Ref NetworkMode, 'PRIVATE']
 
 Resources:
   # ============================================================
@@ -423,6 +434,8 @@ Resources:
       RoleArn: !If [CreateRole, !GetAtt AgentCoreExecutionRole.Arn, !Ref ExistingRoleArn]
       NetworkConfiguration:
         NetworkMode: !Ref NetworkMode
+        SubnetIds: !If [IsVPC, !Ref SubnetIds, !Ref 'AWS::NoValue']
+        SecurityGroupIds: !If [IsVPC, !Ref SecurityGroupIds, !Ref 'AWS::NoValue']
       Description: 'AI QA Test Engine — Test Runner'
 
   OrchestratorRuntime:
@@ -438,6 +451,8 @@ Resources:
       RoleArn: !If [CreateRole, !GetAtt AgentCoreExecutionRole.Arn, !Ref ExistingRoleArn]
       NetworkConfiguration:
         NetworkMode: !Ref NetworkMode
+        SubnetIds: !If [IsVPC, !Ref SubnetIds, !Ref 'AWS::NoValue']
+        SecurityGroupIds: !If [IsVPC, !Ref SecurityGroupIds, !Ref 'AWS::NoValue']
       Description: 'AI QA Test Engine — Orchestrator'
       EnvironmentVariables:
         TEST_RUNNER_ARN: !GetAtt TestRunnerRuntime.AgentRuntimeArn

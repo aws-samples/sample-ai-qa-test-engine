@@ -29,6 +29,9 @@ EXISTING_TEST_BUCKET=""
 EXISTING_CODEBUILD_ROLE_ARN=""
 EXISTING_CUSTOM_RESOURCE_ROLE_ARN=""
 DEPLOY_BUCKET_OVERRIDE=""
+NETWORK_MODE="PUBLIC"
+SUBNET_IDS=""
+SECURITY_GROUP_IDS=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -39,6 +42,9 @@ while [[ $# -gt 0 ]]; do
         --custom-resource-role-arn) EXISTING_CUSTOM_RESOURCE_ROLE_ARN="$2"; shift 2 ;;
         --test-bucket) EXISTING_TEST_BUCKET="$2"; shift 2 ;;
         --deploy-bucket) DEPLOY_BUCKET_OVERRIDE="$2"; shift 2 ;;
+        --network-mode) NETWORK_MODE="$2"; shift 2 ;;
+        --subnets) SUBNET_IDS="$2"; shift 2 ;;
+        --security-groups) SECURITY_GROUP_IDS="$2"; shift 2 ;;
         --help)
             echo "Usage: ./scripts/deploy-infra.sh [options]"
             echo ""
@@ -50,10 +56,12 @@ while [[ $# -gt 0 ]]; do
             echo "  --custom-resource-role-arn ARN Pre-created Custom Resource Lambda role (skip creation)"
             echo "  --test-bucket NAME             Pre-created S3 bucket for test I/O (skip creation)"
             echo "  --deploy-bucket NAME           Pre-created S3 bucket for source uploads"
+            echo "  --network-mode MODE            PUBLIC (default) or PRIVATE (VPC)"
+            echo "  --subnets IDS                  Comma-separated subnet IDs (required for PRIVATE)"
+            echo "  --security-groups IDS          Comma-separated security group IDs (required for PRIVATE)"
             echo ""
             echo "When all three role ARNs are provided, CAPABILITY_NAMED_IAM is not required."
-            echo "This script deploys the full infrastructure stack via CloudFormation."
-            echo "Run ONCE or when infra changes. For code updates, use update-agent.sh."
+            echo "See infra/vpc-requirements.md for VPC deployment guide."
             exit 0 ;;
         *) echo "Unknown option: $1. Use --help."; exit 1 ;;
     esac
@@ -91,11 +99,13 @@ aws s3 cp /tmp/agentcore-orchestrator.zip "s3://${DEPLOY_BUCKET}/source/agentcor
 echo "  ✓ Source uploaded to s3://${DEPLOY_BUCKET}/source/"
 
 # Build CFN parameters
-CFN_PARAMS="ProjectName=$STACK_NAME SourceBucket=$DEPLOY_BUCKET"
+CFN_PARAMS="ProjectName=$STACK_NAME SourceBucket=$DEPLOY_BUCKET NetworkMode=$NETWORK_MODE"
 [ -n "$EXISTING_ROLE_ARN" ] && CFN_PARAMS="$CFN_PARAMS ExistingRoleArn=$EXISTING_ROLE_ARN"
 [ -n "$EXISTING_CODEBUILD_ROLE_ARN" ] && CFN_PARAMS="$CFN_PARAMS ExistingCodeBuildRoleArn=$EXISTING_CODEBUILD_ROLE_ARN"
 [ -n "$EXISTING_CUSTOM_RESOURCE_ROLE_ARN" ] && CFN_PARAMS="$CFN_PARAMS ExistingCustomResourceRoleArn=$EXISTING_CUSTOM_RESOURCE_ROLE_ARN"
 [ -n "$EXISTING_TEST_BUCKET" ] && CFN_PARAMS="$CFN_PARAMS TestBucket=$EXISTING_TEST_BUCKET"
+[ -n "$SUBNET_IDS" ] && CFN_PARAMS="$CFN_PARAMS SubnetIds=$SUBNET_IDS"
+[ -n "$SECURITY_GROUP_IDS" ] && CFN_PARAMS="$CFN_PARAMS SecurityGroupIds=$SECURITY_GROUP_IDS"
 
 # Determine if CAPABILITY_NAMED_IAM is needed (only when creating roles)
 CFN_CAPABILITIES=""
