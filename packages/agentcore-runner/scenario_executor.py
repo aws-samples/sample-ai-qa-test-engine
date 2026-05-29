@@ -101,7 +101,9 @@ def execute_scenario_agentcore(
 
     try:
         # Get AgentCore browser session (CDP connection to remote browser)
-        with browser_session(AWS_REGION) as client:
+        # Use custom browser identifier if set (VPC mode creates a dedicated browser)
+        browser_id = os.environ.get("BROWSER_IDENTIFIER", "aws.browser.v1")
+        with browser_session(AWS_REGION, browser_identifier=browser_id) as client:
             cdp_endpoint_url, cdp_headers = client.generate_ws_headers()
             logger.info(f"Browser session obtained: {cdp_endpoint_url[:60]}...")
 
