@@ -71,13 +71,6 @@ ai-qa-test run --feature-dir .\features\ --browser-mode headed
 | **AgentCore Deploy** | Parallel execution at scale with S3 I/O | `./scripts/deploy-infra.sh` + `./scripts/update-agent.sh` |
 | **Screenshot on Fail** | Auto-captures screenshot when a step fails | Embedded in HTML report |
 
-### Planned (not yet implemented)
-
-| Feature | Description | Status |
-|---------|-------------|--------|
-| **Gauge Support** | .md + .cpt test format | Feature 6 |
-| **Mobile Testing** | AWS Device Farm integration | Feature 7 |
-
 ## AgentCore Deployment (Parallel Execution at Scale)
 
 Deploy the engine to AWS AgentCore for parallel test execution with S3 I/O.
@@ -166,12 +159,21 @@ No CloudFormation, no admin involvement. Just rebuilds the container and tells A
 aws s3 sync ./my-tests/ s3://<bucket>/my-project/tests/
 
 # Invoke orchestrator (payload must be base64-encoded for AWS CLI)
-PAYLOAD=$(echo '{"input_bucket":"<bucket>","input_prefix":"my-project/tests/","output_bucket":"<bucket>","output_prefix":"my-project/results","test_runner_arn":"<test-runner-arn>","max_concurrency":10}' | base64)
+PAYLOAD=$(echo '{"input_bucket":"<bucket>","input_prefix":"my-project/tests/","output_bucket":"<bucket>","output_prefix":"my-project/results","max_concurrency":10}' | base64)
 aws bedrock-agentcore invoke-agent-runtime \
   --agent-runtime-arn <orchestrator-arn> \
   --payload "$PAYLOAD" \
   --cli-read-timeout 300 \
   --region us-east-1 /tmp/result.json
+
+# Run only @smoke scenarios
+PAYLOAD=$(echo '{"input_bucket":"<bucket>","input_prefix":"my-project/tests/","output_bucket":"<bucket>","output_prefix":"my-project/results","tag_filter":"@smoke"}' | base64)
+
+# Exclude @negative-test scenarios
+PAYLOAD=$(echo '{"input_bucket":"<bucket>","input_prefix":"my-project/tests/","output_bucket":"<bucket>","output_prefix":"my-project/results","tag_filter":"not @negative-test"}' | base64)
+
+# Combine tags (AND/OR)
+# tag_filter supports: "@smoke", "not @slow", "@smoke and @login", "@smoke or @regression"
 ```
 
 > **Important — `--cli-read-timeout`**: The AWS CLI's default socket read timeout is ~60s. For invocations expected to run longer than 60 seconds (most real test runs), pass `--cli-read-timeout 300` (or higher, up to 900). Without this, the CLI will retry on its own when its read timeout fires — even though the agent is still working — and you'll see duplicate executions.
