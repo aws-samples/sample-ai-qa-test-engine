@@ -127,8 +127,11 @@ def execute_scenario_agentcore(
                         step_start = time.time()
 
                         try:
+                            # Get max_steps from env var (set by config or payload)
+                            _max_steps = int(os.environ.get("MAX_STEPS", "30"))
                             result = _execute_step(
                                 step, nova, extracted_values, functions, log_callback,
+                                max_steps=_max_steps,
                             )
                             step_duration = time.time() - step_start
 

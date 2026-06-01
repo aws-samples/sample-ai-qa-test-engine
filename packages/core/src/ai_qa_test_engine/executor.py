@@ -191,6 +191,7 @@ def execute_scenario(
                         scenario_name=scenario_name,
                         step_index=step_idx,
                         trajectory_strict=config.trajectory_strict,
+                        max_steps=config.max_steps,
                     )
                     step_duration = time.time() - step_start
 
@@ -317,11 +318,14 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
                   feature_name: str = "",
                   scenario_name: str = "",
                   step_index: int = 0,
-                  trajectory_strict: bool = False) -> Any:
+                  trajectory_strict: bool = False,
+                  max_steps: int = 30) -> Any:
     """Execute a single step. Returns extracted/computed value if any.
 
     Core dispatch logic ported as-is from test_translator/utils/execution.py.
     Extended with trajectory replay: checks cache before act(), saves after.
+    max_steps controls the Nova Act step budget per act() call.
+    Per-step override: @max-steps:N annotation in the step text.
     """
     if step.function_call:
         func_name = step.function_call.function_name
@@ -388,7 +392,15 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
                     return None  # Replay doesn't return ActResult
 
         # No cache hit or replay failed — execute via Nova Act
-        result = nova.act(instruction)
+        # Check for per-step @max-steps:N override
+        step_max_steps = max_steps
+        import re as _re
+        max_steps_match = _re.search(r'@max-steps:(\d+)', step_text, _re.IGNORECASE)
+        if max_steps_match:
+            step_max_steps = int(max_steps_match.group(1))
+            log(f"  → max_steps override: {step_max_steps}")
+
+        result = nova.act(instruction, max_steps=step_max_steps)
 
         # Save trajectory to cache keyed on resolved instruction
         if traj_cache and not traj_cache.is_step_no_cache(step_text):

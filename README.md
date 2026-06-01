@@ -268,6 +268,7 @@ ai-qa-test run --feature-dir ./features/ [options]
 | `--video` | flag | off | Record browser session video |
 | `--no-cache` | flag | off | Disable trajectory replay (always use Nova Act) |
 | `--trajectory-strict` | flag | off | Fail if page state differs during trajectory replay |
+| `--max-steps` | INT | 30 | Max steps per act() call. Override per-step with `@max-steps:N` |
 | `--tags` | STRING | — | Filter scenarios by tag (`@smoke`, `not @slow`, `@id:TC-001`) |
 | `--tag` | KEY=URL | — | Tag-to-URL mapping (repeatable) |
 | `--functions-file` | PATH | — | Custom functions .py file or directory (repeatable) |
@@ -324,6 +325,7 @@ All CLI options can also be set via environment variables (in `.env` or exported
 | `ENABLE_VIDEO_RECORDING` | `--video` | `true`/`false` |
 | `NO_CACHE` | `--no-cache` | `true`/`false` |
 | `TRAJECTORY_STRICT` | `--trajectory-strict` | `true`/`false` |
+| `MAX_STEPS` | `--max-steps` | Max steps per act() call (default: 30) |
 | `CUSTOM_FUNCTIONS_FILE` | `--functions-file` | Path to .py file or directory |
 | `TAG_URL_MAP_FILE` | `--tag-url-map-file` | Path to mapping JSON |
 | `COMMON_STEPS_DIR` | `--common-steps-dir` | Path to .steps directory |
@@ -640,6 +642,32 @@ When I click the submit button @no-cache
 ```
 
 **Requires:** `nova-act-samples` on PYTHONPATH for replay (falls back to Nova Act if not available).
+
+## Max Steps (Control Nova Act Step Budget)
+
+Nova Act has a default limit of 30 steps per `act()` call. For complex interactions (multi-page forms, long wizards), you can increase this.
+
+**Global default (all steps):**
+```bash
+ai-qa-test run --feature-dir ./features/ --max-steps 50
+```
+
+Or via environment variable:
+```
+MAX_STEPS=50
+```
+
+**Per-step override (specific steps only):**
+```gherkin
+Scenario: Complete multi-page registration
+  Given I am on the registration page
+  When I fill out the entire registration wizard @max-steps:60
+  Then I should see the confirmation page
+```
+
+The `@max-steps:60` annotation overrides the global default just for that one step. Other steps still use the global value (default 30).
+
+**AgentCore mode:** Set `MAX_STEPS` as an environment variable on the runtime, or pass in the orchestrator payload.
 
 ## Stop on Failure (Interactive Debugging)
 

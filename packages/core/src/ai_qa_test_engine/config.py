@@ -189,6 +189,12 @@ class AppConfig(BaseSettings):
         description="Disable trajectory replay cache (always use Nova Act)",
     )
 
+    max_steps: int = Field(
+        default=30,
+        alias="MAX_STEPS",
+        description="Maximum steps per act() call (default: 30). Override per-step with @max-steps:N annotation.",
+    )
+
     tag_filter: str | None = Field(
         default=None,
         alias="TAG_FILTER",
