@@ -234,12 +234,21 @@ Resources:
                 Action: [bedrock-agentcore:InvokeAgentRuntime]
                 Resource: !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:runtime/*'
               - Sid: AgentCoreBrowser
-                # Nova Act internally uses AgentCore Browser service — needs broad browser permissions
                 Effect: Allow
-                Action: [bedrock-agentcore:*]
+                Action:
+                  - bedrock-agentcore:CreateBrowser
+                  - bedrock-agentcore:GetBrowser
+                  - bedrock-agentcore:ListBrowsers
+                  - bedrock-agentcore:StartBrowserSession
+                  - bedrock-agentcore:GetBrowserSession
+                  - bedrock-agentcore:ListBrowserSessions
+                  - bedrock-agentcore:StopBrowserSession
+                  - bedrock-agentcore:UpdateBrowserStream
+                  - bedrock-agentcore:ConnectBrowserAutomationStream
+                  - bedrock-agentcore:ConnectBrowserLiveViewStream
                 Resource:
                   - !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:aws:browser/*'
-                  - !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:browser-session/*'
+                  - !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:browser/*'
               - Sid: NovaAct
                 Effect: Allow
                 Action:
