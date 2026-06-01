@@ -1,4 +1,4 @@
-@NextDotGym
+@NextDotGym @regression
 Feature: Data Extraction
   As a tester
   I want to extract data from pages

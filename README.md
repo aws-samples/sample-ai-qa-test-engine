@@ -489,6 +489,34 @@ Scenario: Extract multiple values
   ...
 ```
 
+**Feature-level tags** apply to all scenarios in the file:
+```gherkin
+@regression
+Feature: User Registration
+  # All scenarios below inherit @regression
+
+  Scenario: Register with valid email
+    ...
+
+  Scenario: Register with invalid email
+    ...
+```
+
+Running `--tags "@regression"` will execute both scenarios because the tag is on the Feature. You can also combine feature-level and scenario-level tags:
+```gherkin
+@regression
+Feature: Checkout Flow
+
+  @smoke
+  Scenario: Add item to cart
+    ...
+
+  Scenario: Complete purchase
+    ...
+```
+
+Here `--tags "@smoke"` runs only "Add item to cart", while `--tags "@regression"` runs both.
+
 Also works in AgentCore mode — add `"tag_filter": "@smoke"` to the orchestrator payload.
 
 ## Writing Tests
