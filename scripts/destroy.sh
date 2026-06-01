@@ -27,6 +27,7 @@ done
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 TEST_BUCKET="${STACK_NAME}-tests-${ACCOUNT_ID}-${REGION}"
 DEPLOY_BUCKET="${STACK_NAME}-deploy-${ACCOUNT_ID}-${REGION}"
+LOGS_BUCKET="${STACK_NAME}-access-logs-${ACCOUNT_ID}-${REGION}"
 
 echo "=============================================="
 echo "AI QA Test Engine — DESTROY"
@@ -40,7 +41,7 @@ echo "    • ECR repositories + images"
 echo "    • IAM roles"
 echo "    • CodeBuild projects"
 echo "    • Lambda function"
-echo "    • S3 buckets: $TEST_BUCKET, $DEPLOY_BUCKET"
+echo "    • S3 buckets: $TEST_BUCKET, $DEPLOY_BUCKET, $LOGS_BUCKET"
 echo ""
 if [ "$FORCE" != true ]; then
     read -p "  Are you sure? (yes/no): " CONFIRM
@@ -54,8 +55,9 @@ echo ""
 echo "🗑️  Emptying S3 buckets..."
 aws s3 rm "s3://${TEST_BUCKET}" --recursive --region "$REGION" 2>/dev/null || true
 aws s3 rm "s3://${DEPLOY_BUCKET}" --recursive --region "$REGION" 2>/dev/null || true
+aws s3 rm "s3://${LOGS_BUCKET}" --recursive --region "$REGION" 2>/dev/null || true
 
-# Handle versioned bucket
+# Handle versioned bucket (TestDataBucket now has versioning enabled)
 aws s3api list-object-versions --bucket "$TEST_BUCKET" --region "$REGION" \
     --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' --output json 2>/dev/null | \
     aws s3api delete-objects --bucket "$TEST_BUCKET" --region "$REGION" --delete file:///dev/stdin 2>/dev/null || true

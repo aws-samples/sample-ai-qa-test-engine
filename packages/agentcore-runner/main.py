@@ -181,7 +181,7 @@ def _handle_execute(payload):
     if custom_functions_s3:
         bucket = custom_functions_s3["bucket"]
         key = custom_functions_s3["key"]
-        local_path = f"/tmp/custom_functions_{run_id}.py"
+        local_path = f"/tmp/custom_functions_{run_id}.py"  # nosec B108 — isolated microVM, /tmp is only writable fs
         functions_path = download_file(bucket, key, local_path)
         logger.info(f"Custom functions downloaded: {functions_path}")
 
@@ -294,7 +294,7 @@ def _load_input_variables(input_variables_s3: dict, scenario_id: str, feature_na
 
         # Load _global.json
         try:
-            global_path = f"/tmp/vars_global_{scenario_id}.json"
+            global_path = f"/tmp/vars_global_{scenario_id}.json"  # nosec B108 — isolated microVM
             download_file(bucket, f"{prefix}_global.json", global_path)
             with open(global_path) as f:
                 variables.update(_json.load(f))
@@ -304,7 +304,7 @@ def _load_input_variables(input_variables_s3: dict, scenario_id: str, feature_na
 
         # Load feature-level file
         try:
-            feat_path = f"/tmp/vars_feat_{scenario_id}.json"
+            feat_path = f"/tmp/vars_feat_{scenario_id}.json"  # nosec B108 — isolated microVM
             download_file(bucket, f"{prefix}{feature_name}.json", feat_path)
             with open(feat_path) as f:
                 variables.update(_json.load(f))
@@ -315,7 +315,7 @@ def _load_input_variables(input_variables_s3: dict, scenario_id: str, feature_na
         # Load scenario-specific file
         if scenario_id:
             try:
-                scen_path = f"/tmp/vars_scen_{scenario_id}.json"
+                scen_path = f"/tmp/vars_scen_{scenario_id}.json"  # nosec B108 — isolated microVM
                 download_file(bucket, f"{prefix}{scenario_id}.json", scen_path)
                 with open(scen_path) as f:
                     variables.update(_json.load(f))
@@ -328,7 +328,7 @@ def _load_input_variables(input_variables_s3: dict, scenario_id: str, feature_na
         bucket = input_variables_s3["bucket"]
         key = input_variables_s3["key"]
         try:
-            local_path = f"/tmp/vars_{scenario_id}.json"
+            local_path = f"/tmp/vars_{scenario_id}.json"  # nosec B108 — isolated microVM
             download_file(bucket, key, local_path)
             with open(local_path) as f:
                 variables = _json.load(f)

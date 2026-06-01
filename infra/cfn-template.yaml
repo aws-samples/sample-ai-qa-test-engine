@@ -56,17 +56,112 @@ Conditions:
 
 Resources:
   # ============================================================
-  # S3 Bucket (optional)
+  # S3 Bucket — Access Logs
+  # ============================================================
+  AccessLogsBucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateBucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_18
+            comment: Access logging bucket cannot log to itself (circular dependency)
+    Properties:
+      BucketName: !Sub '${ProjectName}-access-logs-${AWS::AccountId}-${AWS::Region}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireLogs90Days
+            Status: Enabled
+            ExpirationInDays: 90
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+
+  AccessLogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: CreateBucket
+    Properties:
+      Bucket: !Ref AccessLogsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: S3ServerAccessLogsPolicy
+            Effect: Allow
+            Principal:
+              Service: logging.s3.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub '${AccessLogsBucket.Arn}/*'
+            Condition:
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:aws:s3:::${ProjectName}-tests-${AWS::AccountId}-${AWS::Region}'
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt AccessLogsBucket.Arn
+              - !Sub '${AccessLogsBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  # ============================================================
+  # S3 Bucket — Test Data (optional)
   # ============================================================
   TestDataBucket:
     Type: AWS::S3::Bucket
     Condition: CreateBucket
+    DependsOn: AccessLogsBucketPolicy
     Properties:
       BucketName: !Sub '${ProjectName}-tests-${AWS::AccountId}-${AWS::Region}'
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LoggingConfiguration:
+        DestinationBucketName: !Ref AccessLogsBucket
+        LogFilePrefix: test-bucket-logs/
+
+  TestDataBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: CreateBucket
+    Properties:
+      Bucket: !Ref TestDataBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt TestDataBucket.Arn
+              - !Sub '${TestDataBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
 
   # ============================================================
   # ECR Repositories
@@ -77,10 +172,12 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       RepositoryName: !Sub '${AWS::StackName}-test-runner'
-      ImageTagMutability: MUTABLE
+      ImageTagMutability: IMMUTABLE
       EmptyOnDelete: true
       ImageScanningConfiguration:
         ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: KMS
 
   OrchestratorECR:
     Type: AWS::ECR::Repository
@@ -88,10 +185,12 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       RepositoryName: !Sub '${AWS::StackName}-orchestrator'
-      ImageTagMutability: MUTABLE
+      ImageTagMutability: IMMUTABLE
       EmptyOnDelete: true
       ImageScanningConfiguration:
         ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: KMS
 
   # ============================================================
   # IAM — AgentCore Execution Role
@@ -111,8 +210,6 @@ Resources:
             Condition:
               StringEquals:
                 aws:SourceAccount: !Ref AWS::AccountId
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/BedrockAgentCoreFullAccess
       Policies:
         - PolicyName: TestEnginePolicy
           PolicyDocument:
@@ -121,15 +218,28 @@ Resources:
               - Sid: S3Access
                 Effect: Allow
                 Action: [s3:GetObject, s3:PutObject, s3:ListBucket, s3:HeadObject]
-                Resource: '*'
-              - Sid: BedrockAccess
+                Resource:
+                  - !Sub 'arn:aws:s3:::${ProjectName}-tests-${AWS::AccountId}-${AWS::Region}'
+                  - !Sub 'arn:aws:s3:::${ProjectName}-tests-${AWS::AccountId}-${AWS::Region}/*'
+              - Sid: BedrockInvokeModel
                 Effect: Allow
                 Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/*'
+                  - !Sub 'arn:aws:bedrock:us-*::foundation-model/*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*'
+                  - 'arn:aws:bedrock:us-*:*:inference-profile/*'
               - Sid: AgentCoreInvoke
                 Effect: Allow
                 Action: [bedrock-agentcore:InvokeAgentRuntime]
                 Resource: !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:runtime/*'
+              - Sid: AgentCoreBrowser
+                # Nova Act internally uses AgentCore Browser service — needs broad browser permissions
+                Effect: Allow
+                Action: [bedrock-agentcore:*]
+                Resource:
+                  - !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:aws:browser/*'
+                  - !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:browser-session/*'
               - Sid: NovaAct
                 Effect: Allow
                 Action:
@@ -145,18 +255,21 @@ Resources:
                   - nova-act:DeleteWorkflowDefinition
                   - nova-act:DeleteWorkflowRun
                 Resource: '*'
-              - Sid: Browser
+              - Sid: ECRPull
                 Effect: Allow
-                Action: [bedrock-agentcore:CreateBrowserSession, bedrock-agentcore:GetBrowserSession, bedrock-agentcore:StopBrowserSession]
-                Resource: '*'
-              - Sid: ECR
+                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability]
+                Resource:
+                  - !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${AWS::StackName}-*'
+              - Sid: ECRAuth
+                # GetAuthorizationToken does not support resource-level permissions
                 Effect: Allow
-                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability, ecr:GetAuthorizationToken]
+                Action: [ecr:GetAuthorizationToken]
                 Resource: '*'
               - Sid: Logs
                 Effect: Allow
                 Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents, logs:DescribeLogGroups, logs:DescribeLogStreams]
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock-agentcore/*'
               - Sid: XRay
                 Effect: Allow
                 Action: [xray:PutTraceSegments, xray:PutTelemetryRecords, xray:GetSamplingRules, xray:GetSamplingTargets]
@@ -164,7 +277,8 @@ Resources:
               - Sid: SecretsManager
                 Effect: Allow
                 Action: [secretsmanager:GetSecretValue]
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:ai-qa-*'
 
   # ============================================================
   # IAM — CodeBuild Role
@@ -186,15 +300,26 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Effect: Allow
+              - Sid: Logs
+                Effect: Allow
                 Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
-                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*'
-              - Effect: Allow
-                Action: [ecr:BatchCheckLayerAvailability, ecr:GetDownloadUrlForLayer, ecr:BatchGetImage, ecr:GetAuthorizationToken, ecr:PutImage, ecr:InitiateLayerUpload, ecr:UploadLayerPart, ecr:CompleteLayerUpload]
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}-*'
+              - Sid: ECRAuth
+                # GetAuthorizationToken does not support resource-level permissions
+                Effect: Allow
+                Action: [ecr:GetAuthorizationToken]
                 Resource: '*'
-              - Effect: Allow
+              - Sid: ECRPush
+                Effect: Allow
+                Action: [ecr:BatchCheckLayerAvailability, ecr:GetDownloadUrlForLayer, ecr:BatchGetImage, ecr:PutImage, ecr:InitiateLayerUpload, ecr:UploadLayerPart, ecr:CompleteLayerUpload]
+                Resource:
+                  - !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${AWS::StackName}-*'
+              - Sid: S3Source
+                Effect: Allow
                 Action: [s3:GetObject, s3:ListBucket]
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:aws:s3:::${ProjectName}-deploy-${AWS::AccountId}-${AWS::Region}'
+                  - !Sub 'arn:aws:s3:::${ProjectName}-deploy-${AWS::AccountId}-${AWS::Region}/*'
 
   # ============================================================
   # IAM — Lambda Custom Resource Role
@@ -221,10 +346,21 @@ Resources:
               - Effect: Allow
                 Action: [codebuild:StartBuild, codebuild:BatchGetBuilds, codebuild:BatchGetProjects]
                 Resource: !Sub 'arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${ProjectName}-*'
+              - Sid: DLQAccess
+                Effect: Allow
+                Action: [sqs:SendMessage]
+                Resource: !Sub 'arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:${ProjectName}-codebuild-trigger-dlq'
 
   # ============================================================
   # Lambda — CodeBuild Trigger (Custom Resource)
   # ============================================================
+  CodeBuildTriggerDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${ProjectName}-codebuild-trigger-dlq'
+      MessageRetentionPeriod: 1209600
+      KmsMasterKeyId: alias/aws/sqs
+
   CodeBuildTriggerFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -233,6 +369,14 @@ Resources:
       Role: !If [CreateCustomResourceRole, !GetAtt CustomResourceRole.Arn, !Ref ExistingCustomResourceRoleArn]
       Runtime: python3.11
       Timeout: 900
+      ReservedConcurrentExecutions: 1
+      DeadLetterConfig:
+        TargetArn: !GetAtt CodeBuildTriggerDLQ.Arn
+      VpcConfig: !If
+        - IsVPC
+        - SubnetIds: !Ref SubnetIds
+          SecurityGroupIds: !Ref SecurityGroupIds
+        - !Ref AWS::NoValue
       Code:
         ZipFile: |
           import boto3, json, logging, time

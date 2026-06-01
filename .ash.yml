@@ -1,0 +1,23 @@
+---
+# ASH Configuration
+project_name: ai-qa-test-engine
+
+global_settings:
+  severity_threshold: MEDIUM
+  ignore_paths:
+    - path: '.secrets.baseline'
+      reason: 'Detect-secrets baseline file contains hashed values by design'
+    - path: '.ash.yml'
+      reason: 'ASH config file contains suppression rule IDs that trigger false positives'
+  suppressions:
+    - rule_id: 'SECRET-SECRET-KEYWORD'
+      path: 'README.md'
+      reason: 'Example documentation showing Secrets Manager usage with dummy values'
+    - rule_id: 'SECRET-SECRET-KEYWORD'
+      path: 'infra/cfn-template.yaml'
+      reason: 'IAM policy referencing secretsmanager action, not an actual credential'
+
+scanners:
+  detect-secrets:
+    options:
+      baseline_file: '.secrets.baseline'
