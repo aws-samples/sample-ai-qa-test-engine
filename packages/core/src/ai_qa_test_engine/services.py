@@ -66,6 +66,42 @@ class TranslationService:
             log(f"No .feature files found in {feature_dir}", "warning")
             return []
 
+        # Pre-filter features by tag if a tag filter is active
+        # This avoids translating features that will be entirely skipped at execution time
+        tag_filter = self.config.tag_filter
+        if tag_filter:
+            from ai_qa_test_engine.tag_filter import matches_tag_filter
+            from ai_qa_test_engine.parser import parse_gherkin_file
+
+            filtered_files = []
+            for f in feature_files:
+                try:
+                    ast = parse_gherkin_file(f)
+                    feature_node = ast.get("feature", {})
+                    feature_tags = [t["name"] for t in feature_node.get("tags", [])]
+                    # Check if ANY scenario in this feature would pass the tag filter
+                    has_matching_scenario = False
+                    for child in feature_node.get("children", []):
+                        scenario_node = child.get("scenario", {})
+                        if not scenario_node:
+                            continue
+                        scenario_tags = feature_tags + [t["name"] for t in scenario_node.get("tags", [])]
+                        if matches_tag_filter(scenario_tags, tag_filter):
+                            has_matching_scenario = True
+                            break
+                    if has_matching_scenario:
+                        filtered_files.append(f)
+                    else:
+                        log(f"  ⊘ Skipped (tag filter): {f.name}")
+                except Exception:
+                    # If we can't parse tags, include it (let it fail later if needed)
+                    filtered_files.append(f)
+            feature_files = filtered_files
+
+        if not feature_files:
+            log("No feature files match the tag filter", "warning")
+            return []
+
         log(f"Found {len(feature_files)} .feature file(s) in {feature_dir}")
 
         # Check cache for each file
@@ -85,13 +121,14 @@ class TranslationService:
 
         log(f"Translating {len(stale_files)} stale feature(s)...")
 
-        # Translate stale files
+        # Translate stale files (pass only stale files, not all)
         translated = translate_all_features(
             input_dir=feature_dir,
             output_dir=cache_dir,
             tag_url_map=tag_url_map,
             bedrock_model_id=self.config.bedrock_model_id,
             common_steps_dir=self.config.common_steps_dir,
+            feature_files=stale_files,
         )
 
         # Update cache hashes for translated files

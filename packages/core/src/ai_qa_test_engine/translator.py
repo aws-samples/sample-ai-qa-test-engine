@@ -139,6 +139,7 @@ def translate_all_features(
     tag_url_map: dict[str, str],
     bedrock_model_id: str | None = None,
     common_steps_dir: Path | None = None,
+    feature_files: list[Path] | None = None,
 ) -> list[dict]:
     """Translate all Gherkin .feature files to JSON test structures.
 
@@ -148,6 +149,8 @@ def translate_all_features(
         tag_url_map: Mapping of Gherkin tags to starting URLs.
         bedrock_model_id: Bedrock model ID for the Strands agent.
         common_steps_dir: Directory containing .steps files for @include resolution.
+        feature_files: Optional pre-filtered list of feature files to translate.
+            If None, discovers all .feature files in input_dir recursively.
 
     Returns:
         List of translated feature dictionaries.
@@ -167,7 +170,8 @@ def translate_all_features(
             "set DEFAULT_TEST_URL, or provide a tag-url-mapping.json file."
         )
 
-    feature_files = sorted(input_dir.rglob("*.feature"))
+    if feature_files is None:
+        feature_files = sorted(input_dir.rglob("*.feature"))
     if not feature_files:
         raise ValueError(f"No .feature files found in {input_dir}")
 
@@ -196,7 +200,8 @@ def translate_all_features(
             translated_features.append(feature_data)
         except Exception as e:
             print(f"    ✗ Error translating {feature_file.name}: {e}")
-            raise
+            # Continue with remaining features instead of aborting the entire run
+            continue
 
     print(f"  ✓ Translated {len(translated_features)}/{len(feature_files)} feature(s)")
     return translated_features
