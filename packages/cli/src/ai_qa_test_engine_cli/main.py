@@ -31,6 +31,7 @@ def cli():
 @click.option("--trajectory-strict", is_flag=True, default=False, help="Strict trajectory validation (fail on mismatch)")
 @click.option("--max-steps", type=int, default=None, help="Max steps per act() call (default: 30). Override per-step with @max-steps:N")
 @click.option("--tags", type=str, default=None, help="Filter scenarios by tag (e.g., '@smoke', 'not @slow', '@id:TC-001')")
+@click.option("--strict-mode", is_flag=True, default=False, help="QA strict mode: prevents Nova Act from wandering off-script")
 @click.option("--tag", multiple=True, help="Tag-to-URL mapping (key=url)")
 @click.option("--functions-file", multiple=True, type=click.Path(exists=True, path_type=Path), help="Custom functions file or directory (can specify multiple)")
 @click.option("--env-file", type=click.Path(exists=True, path_type=Path), default=None, help="Path to .env file")
@@ -48,6 +49,7 @@ def run(
     trajectory_strict,
     max_steps,
     tags,
+    strict_mode,
     tag,
     functions_file,
     env_file,
@@ -91,6 +93,8 @@ def run(
         config_kwargs["max_steps"] = max_steps
     if tags:
         config_kwargs["tag_filter"] = tags
+    if strict_mode:
+        config_kwargs["strict_mode"] = True
     if functions_file:
         # First path goes into config (used by service for primary loading)
         config_kwargs["custom_functions_file"] = functions_file[0]

@@ -171,6 +171,9 @@ def execute_scenario(
             workflow_definition_name = getattr(nova, '_workflow_definition_name', None)
             workflow_run_id = getattr(nova, '_workflow_run_id', None)
 
+            # Set strict mode flag on the nova instance for downstream use
+            nova._strict_mode = config.strict_mode
+
             for step_idx, step in enumerate(steps, 1):
                 keyword = step.original_keyword
                 text = step.original_text
@@ -391,6 +394,18 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
 
     elif step.instruction:
         instruction = substitute_variables(step.instruction, extracted_values)
+
+        # QA strict mode: prepend guardrail prompt to prevent wandering
+        if hasattr(nova, '_strict_mode') and nova._strict_mode:
+            instruction = (
+                "You are a QA tester executing a single test step. "
+                "Do exactly what is described below — nothing more. "
+                "Do not navigate to other pages or click links not mentioned. "
+                "If an element cannot be found on the current page, stop and return immediately. "
+                "If an error or validation message appears after your action, do not attempt to correct it — stop and return. "
+                f"\nTask: {instruction}"
+            )
+
         log(f"  → Action: {instruction}")
 
         step_text = step.original_text

@@ -207,6 +207,12 @@ class AppConfig(BaseSettings):
         description="Strict mode for trajectory replay validation (raise on mismatch)",
     )
 
+    strict_mode: bool = Field(
+        default=False,
+        alias="STRICT_MODE",
+        description="QA strict mode: prepend guardrail prompt to act() calls to prevent wandering",
+    )
+
     # --- Input Variables ---
     input_variables_file: Path | None = Field(
         default=None,
