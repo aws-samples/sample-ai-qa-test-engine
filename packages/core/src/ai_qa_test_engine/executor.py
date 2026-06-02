@@ -142,6 +142,8 @@ def execute_scenario(
     extracted_values: dict[str, Any] = {}
     step_results: list[StepResult] = []
     errors: list[str] = []
+    workflow_definition_name: str | None = None
+    workflow_run_id: str | None = None
 
     # Pre-load input variables from JSON file if specified
     if config.input_variables_file:
@@ -165,6 +167,10 @@ def execute_scenario(
 
     try:
         with create_browser_session(config, base_url, workflow_name) as nova:
+            # Capture workflow metadata for end-of-run summary
+            workflow_definition_name = getattr(nova, '_workflow_definition_name', None)
+            workflow_run_id = getattr(nova, '_workflow_run_id', None)
+
             for step_idx, step in enumerate(steps, 1):
                 keyword = step.original_keyword
                 text = step.original_text
@@ -195,6 +201,15 @@ def execute_scenario(
                     )
                     step_duration = time.time() - step_start
 
+                    # Capture trajectory file path from ActResult (instruction steps)
+                    # or from cache replay (stored on nova instance)
+                    trajectory_file = None
+                    if hasattr(result, 'trajectory_file_path') and result.trajectory_file_path:
+                        trajectory_file = result.trajectory_file_path
+                    elif hasattr(nova, '_last_trajectory_file') and nova._last_trajectory_file:
+                        trajectory_file = nova._last_trajectory_file
+                        nova._last_trajectory_file = None  # Reset after capture
+
                     step_results.append(StepResult(
                         step_number=step_idx,
                         keyword=keyword,
@@ -202,6 +217,7 @@ def execute_scenario(
                         status="PASSED",
                         duration_seconds=step_duration,
                         extracted_value=result,
+                        trajectory_file=trajectory_file,
                     ))
                     log(f"  ✓ Step {step_idx} passed ({step_duration:.1f}s)")
 
@@ -310,6 +326,8 @@ def execute_scenario(
         steps=step_results,
         extracted_variables=extracted_values,
         errors=errors,
+        workflow_definition_name=workflow_definition_name,
+        workflow_run_id=workflow_run_id,
     )
 
 
@@ -389,6 +407,8 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
                 replayed = replay_cached_trajectory(nova, cached_path, strict=trajectory_strict)
                 if replayed:
                     log(f"  → Replay successful (no AI model call)")
+                    # Store trajectory path for detailed report access
+                    nova._last_trajectory_file = str(cached_path)
                     return None  # Replay doesn't return ActResult
 
         # No cache hit or replay failed — execute via Nova Act

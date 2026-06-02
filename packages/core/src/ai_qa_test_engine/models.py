@@ -179,6 +179,9 @@ class StepResult:
     error: str | None = None
     screenshot: str | None = None  # base64 PNG on failure
     extracted_value: Any = None
+    prompt_sent: str | None = None  # The actual prompt/instruction sent to Nova Act
+    screenshot_after: str | None = None  # base64 PNG after step (for detailed report)
+    trajectory_file: str | None = None  # Path to Nova Act trajectory JSON (for detailed report)
 
 
 @dataclass
@@ -192,6 +195,8 @@ class ScenarioResult:
     steps: list[StepResult] = field(default_factory=list)
     extracted_variables: dict[str, Any] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
+    workflow_definition_name: str | None = None
+    workflow_run_id: str | None = None
 
 
 @dataclass

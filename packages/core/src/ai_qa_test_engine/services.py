@@ -22,6 +22,7 @@ from ai_qa_test_engine.reporter import (
     generate_scenario_html,
     write_report,
 )
+from ai_qa_test_engine.detailed_report import generate_detailed_report
 from ai_qa_test_engine.translator import translate_all_features
 
 
@@ -267,6 +268,21 @@ class TestExecutionService:
         write_report(report_html, report_path)
         log(f"  Report: {report_path}")
 
+        # Write detailed trajectory report
+        detailed_html = generate_detailed_report(summary, all_results)
+        detailed_path = report_dir / "detailed_report.html"
+        write_report(detailed_html, detailed_path)
+        log(f"  Detailed Report: {detailed_path}")
+
+        # Collect Nova Act workflow info
+        wf_names = set()
+        wf_runs = []
+        for r in all_results:
+            if r.workflow_definition_name:
+                wf_names.add(r.workflow_definition_name)
+            if r.workflow_run_id:
+                wf_runs.append(r.workflow_run_id)
+
         # Write JSON summary
         summary_path = report_dir / "summary.json"
         summary_dict = {
@@ -278,6 +294,10 @@ class TestExecutionService:
             "errors": summary.errors,
             "total_duration_seconds": summary.total_duration_seconds,
             "status": summary.status,
+            "nova_act": {
+                "workflow_definitions": sorted(wf_names),
+                "workflow_run_ids": wf_runs,
+            },
         }
         summary_path.parent.mkdir(parents=True, exist_ok=True)
         with open(summary_path, "w") as f:
@@ -291,6 +311,13 @@ class TestExecutionService:
         log(f"  Duration: {duration:.2f}s")
         log(f"  Report: {report_path}")
         log(f"  Log: {log_file_path}")
+        if wf_names or wf_runs:
+            log(f"  Nova Act:")
+            for name in sorted(wf_names):
+                log(f"    Workflow Definition: {name}")
+            for wf_run in wf_runs:
+                log(f"    Workflow Run ID:     {wf_run}")
+
         log(f"{'=' * 70}")
 
         log_file.close()

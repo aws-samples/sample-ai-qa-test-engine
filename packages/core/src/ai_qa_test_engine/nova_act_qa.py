@@ -28,15 +28,52 @@ class Expectation:
 
     def _extract_string(self) -> str:
         result = self._nova.act_get(self._prompt, schema={"type": "string"})
+        self._capture_trajectory(result)
         return cast(str, result.parsed_response)
 
     def _extract_number(self) -> float:
         result = self._nova.act_get(self._prompt, schema={"type": "number"})
+        self._capture_trajectory(result)
         return cast(float, result.parsed_response)
 
     def _extract_boolean(self) -> bool:
         result = self._nova.act_get(self._prompt, schema={"type": "boolean"})
+        self._capture_trajectory(result)
         return cast(bool, result.parsed_response)
+
+    def _capture_trajectory(self, result) -> None:
+        """Capture trajectory file path from act_get result.
+
+        The SDK may not expose trajectory_file_path for act_get even with
+        replayable=True. Fall back to scanning the session logs directory
+        for the most recent trajectory JSON that hasn't been seen before.
+        """
+        # Try the direct attribute first
+        if hasattr(result, 'trajectory_file_path') and result.trajectory_file_path:
+            self._nova._last_trajectory_file = result.trajectory_file_path
+            return
+
+        # Fallback: find the newest trajectory file in the session logs dir
+        try:
+            from pathlib import Path
+            logs_dir = Path(self._nova.get_session_logs_directory())
+            if logs_dir.exists():
+                # Track which trajectory files we've already seen
+                if not hasattr(self._nova, '_seen_trajectory_files'):
+                    self._nova._seen_trajectory_files = set()
+
+                traj_files = sorted(
+                    logs_dir.glob("*_trajectory.json"),
+                    key=lambda p: p.stat().st_mtime,
+                    reverse=True,
+                )
+                for tf in traj_files:
+                    if str(tf) not in self._nova._seen_trajectory_files:
+                        self._nova._last_trajectory_file = str(tf)
+                        self._nova._seen_trajectory_files.add(str(tf))
+                        return
+        except Exception:
+            pass
 
     def _fail(self, default: str, msg: str | None) -> str:
         if msg is not None:
