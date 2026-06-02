@@ -156,11 +156,18 @@ class AppConfig(BaseSettings):
         description="Directory for translation cache (git-committable)",
     )
 
+    # --- Work Directory (base for all working output: translated, trajectories, etc.) ---
+    work_dir: Path | None = Field(
+        default=None,
+        alias="WORK_DIR",
+        description="Base directory for working output (translated, trajectories, recordings, extracted_variables). Defaults to CWD.",
+    )
+
     # --- Report Settings ---
     report_dir: Path = Field(
         default=Path("reports"),
         alias="REPORT_DIR",
-        description="Directory for generated HTML reports",
+        description="Directory for generated HTML reports (each run gets a sub-directory)",
     )
 
     # --- Video Recording Settings ---
@@ -266,11 +273,18 @@ class AppConfig(BaseSettings):
             return path
         return Path.cwd() / path
 
+    def _resolve_work_path(self, path: Path) -> Path:
+        """Resolve a path relative to work_dir (or CWD if work_dir not set)."""
+        if path.is_absolute():
+            return path
+        base = self._resolve_path(self.work_dir) if self.work_dir else Path.cwd()
+        return base / path
+
     def resolve_feature_dir(self) -> Path:
         return self._resolve_path(self.feature_dir)
 
     def resolve_extracted_variables_dir(self) -> Path:
-        return self._resolve_path(self.extracted_variables_dir)
+        return self._resolve_work_path(self.extracted_variables_dir)
 
     def resolve_custom_functions_file(self) -> Path | None:
         if self.custom_functions_file is None:
@@ -278,13 +292,13 @@ class AppConfig(BaseSettings):
         return self._resolve_path(self.custom_functions_file)
 
     def resolve_cache_dir(self) -> Path:
-        return self._resolve_path(self.cache_dir)
+        return self._resolve_work_path(self.cache_dir)
 
     def resolve_report_dir(self) -> Path:
         return self._resolve_path(self.report_dir)
 
     def resolve_video_recording_dir(self) -> Path:
-        return self._resolve_path(self.video_recording_dir)
+        return self._resolve_work_path(self.video_recording_dir)
 
     def resolve_trajectory_cache_dir(self) -> Path:
-        return self._resolve_path(self.trajectory_cache_dir)
+        return self._resolve_work_path(self.trajectory_cache_dir)

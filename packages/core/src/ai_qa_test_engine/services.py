@@ -161,8 +161,11 @@ class TestExecutionService:
         Returns:
             RunSummary with all results
         """
-        # Set up log file in report directory
-        report_dir = self.config.resolve_report_dir()
+        # Set up run ID and report directory (each run gets its own subdirectory)
+        start_time = time.time()
+        run_id = f"run-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:6]}"
+
+        report_dir = self.config.resolve_report_dir() / run_id
         report_dir.mkdir(parents=True, exist_ok=True)
         log_file_path = report_dir / "execution.log"
         log_file = open(log_file_path, "w", encoding="utf-8")
@@ -176,9 +179,6 @@ class TestExecutionService:
                 log_callback(msg, level)
             else:
                 print(f"[{level.upper()}] {msg}")
-
-        start_time = time.time()
-        run_id = f"run-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:6]}"
 
         log(f"{'=' * 70}")
         log(f"AI QA Test Engine — Run {run_id}")
@@ -299,7 +299,6 @@ class TestExecutionService:
         )
 
         # Write combined report
-        report_dir = self.config.resolve_report_dir()
         report_html = generate_combined_report(summary, all_results)
         report_path = report_dir / "report.html"
         write_report(report_html, report_path)

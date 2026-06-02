@@ -22,7 +22,8 @@ def cli():
 
 @cli.command()
 @click.option("--feature-dir", type=click.Path(exists=True, path_type=Path), help="Directory containing .feature files")
-@click.option("--output-dir", type=click.Path(path_type=Path), help="Directory for reports")
+@click.option("--output-dir", type=click.Path(path_type=Path), help="Directory for reports (each run gets a sub-directory)")
+@click.option("--work-dir", type=click.Path(path_type=Path), help="Base directory for working output (translated, trajectories, etc.)")
 @click.option("--browser-mode", type=click.Choice(["headed", "headless"]), default=None, help="Browser mode")
 @click.option("--stop-on-failure", is_flag=True, default=False, help="Stop and keep browser open on failure")
 @click.option("--force-translate", is_flag=True, default=False, help="Force re-translation (bypass cache)")
@@ -41,6 +42,7 @@ def cli():
 def run(
     feature_dir,
     output_dir,
+    work_dir,
     browser_mode,
     stop_on_failure,
     force_translate,
@@ -77,6 +79,8 @@ def run(
         config_kwargs["feature_dir"] = feature_dir
     if output_dir:
         config_kwargs["report_dir"] = output_dir
+    if work_dir:
+        config_kwargs["work_dir"] = work_dir
     if browser_mode:
         config_kwargs["browser_mode"] = browser_mode
     if stop_on_failure:

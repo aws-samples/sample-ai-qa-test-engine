@@ -260,11 +260,13 @@ ai-qa-test run --feature-dir ./features/ [options]
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--feature-dir` | PATH | required | Directory containing .feature files |
-| `--output-dir` | PATH | `./reports` | Directory for HTML reports |
+| `--feature-dir` | PATH | required | Directory containing .feature files (recursive search) |
+| `--output-dir` | PATH | `./reports` | Directory for HTML reports (each run gets a sub-directory) |
+| `--work-dir` | PATH | CWD | Base directory for working output (translated, trajectories, recordings) |
 | `--browser-mode` | `headed`/`headless` | `headed` | Browser visibility mode |
 | `--stop-on-failure` | flag | off | Pause on failure, keep browser open for debugging |
 | `--force-translate` | flag | off | Bypass translation cache, re-translate all features |
+| `--strict-mode` | flag | off | QA strict mode: prevents Nova Act from wandering off-script |
 | `--video` | flag | off | Record browser session video |
 | `--no-cache` | flag | off | Disable trajectory replay (always use Nova Act) |
 | `--trajectory-strict` | flag | off | Fail if page state differs during trajectory replay |
@@ -273,6 +275,8 @@ ai-qa-test run --feature-dir ./features/ [options]
 | `--tag` | KEY=URL | — | Tag-to-URL mapping (repeatable) |
 | `--functions-file` | PATH | — | Custom functions .py file or directory (repeatable) |
 | `--env-file` | PATH | `.env` | Path to environment file |
+| `--variables-file` | PATH | — | JSON file with pre-loaded input variables |
+| `--common-steps-dir` | PATH | — | Directory containing .steps files for @include |
 | `--tag-url-map-file` | PATH | — | Path to tag-url-mapping.json |
 | `--common-steps-dir` | PATH | — | Directory containing .steps files for @include |
 | `--variables-file` | PATH | — | JSON file with pre-loaded input variables |
@@ -319,9 +323,11 @@ All CLI options can also be set via environment variables (in `.env` or exported
 |----------|---------------|-------------|
 | `FEATURE_DIR` | `--feature-dir` | Feature files directory |
 | `REPORT_DIR` | `--output-dir` | Reports output directory |
+| `WORK_DIR` | `--work-dir` | Base directory for working output (translated, trajectories, etc.) |
 | `BROWSER_MODE` | `--browser-mode` | `headed` or `headless` |
 | `STOP_ON_FAILURE` | `--stop-on-failure` | `true`/`false` |
 | `FORCE_TRANSLATE` | `--force-translate` | `true`/`false` |
+| `STRICT_MODE` | `--strict-mode` | `true`/`false` — QA guardrail prompt |
 | `ENABLE_VIDEO_RECORDING` | `--video` | `true`/`false` |
 | `NO_CACHE` | `--no-cache` | `true`/`false` |
 | `TRAJECTORY_STRICT` | `--trajectory-strict` | `true`/`false` |
