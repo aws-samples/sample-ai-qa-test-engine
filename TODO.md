@@ -1,15 +1,12 @@
 # TODO
 
 ## CLI Improvements
-- [ ] Add `--work-dir` flag to set base directory for all output (translated, trajectories, reports, recordings, extracted_variables)
-- [ ] Document `--feature-dir` accepts both a directory and a single file in README
 - [ ] PII masking in execution logs (mask secrets, passwords, emails in log output)
 
 ## Execution
 - [ ] Support tags on Examples blocks in Scenario Outlines (update translator prompt to merge Outline tags + Examples-level tags into expanded scenarios)
 - [ ] Per-scenario input variables (different vars per scenario via JSON keyed by scenario_id)
 - [ ] Global variables (`${global.name}`) vs scenario-scoped (`${name}`)
-- [ ] Run-ID-based output directories (preserve history instead of overwriting reports)
 - [ ] Fix Pydantic validation warning for `${variable}` references that come from input variables file
 - [ ] Local parallel execution (run multiple scenarios concurrently with `--parallel N`)
 - [ ] Attach to existing browser session and continue from step N (CDP connect to locally open browser)
@@ -21,7 +18,6 @@
 - [ ] Presigned URL for HTML report (view without S3 console access)
 
 ## Documentation
-- [ ] Document CLI usage patterns in README (single file, directory, multiple files)
 - [ ] Document screenshot extraction usage (prompt format, store as, model config)
 - [ ] Auto-inference for screenshot extraction (detect IDs, VINs, emails without explicit prompt)
 - [ ] User-defined model support for screenshot extraction (configure vision model via env/CLI)
