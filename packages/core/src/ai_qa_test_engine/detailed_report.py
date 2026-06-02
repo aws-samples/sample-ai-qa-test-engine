@@ -336,6 +336,16 @@ def _render_scenario(result: ScenarioResult) -> str:
 
     steps_html = "\n".join(_render_gherkin_step(step) for step in result.steps)
 
+    # Per-scenario workflow info
+    wf_html = ""
+    if result.workflow_definition_name or result.workflow_run_id:
+        wf_html = '<div class="scenario-workflow">'
+        if result.workflow_definition_name:
+            wf_html += f'<span>Workflow: <code>{result.workflow_definition_name}</code></span>'
+        if result.workflow_run_id:
+            wf_html += f'<span>Run ID: <code>{result.workflow_run_id}</code></span>'
+        wf_html += '</div>'
+
     return f"""
     <details class="scenario-detail {status_class}" {'open' if result.status != 'PASSED' else ''}>
       <summary class="scenario-summary">
@@ -345,6 +355,7 @@ def _render_scenario(result: ScenarioResult) -> str:
         <span class="scenario-duration">({result.duration_seconds:.1f}s)</span>
       </summary>
       <div class="scenario-body">
+        {wf_html}
         {steps_html}
       </div>
     </details>
@@ -367,19 +378,6 @@ def generate_detailed_report(summary: RunSummary, results: list[ScenarioResult])
     """
     scenarios_html = "\n".join(_render_scenario(r) for r in results)
     timestamp = summary.timestamp or datetime.now(timezone.utc).isoformat()
-
-    # Collect Nova Act workflow metadata
-    wf_names = sorted(set(r.workflow_definition_name for r in results if r.workflow_definition_name))
-    wf_runs = [r.workflow_run_id for r in results if r.workflow_run_id]
-
-    workflow_html = ""
-    if wf_names or wf_runs:
-        workflow_items = ""
-        for name in wf_names:
-            workflow_items += f"<li><strong>Workflow Definition:</strong> <code>{name}</code></li>"
-        for run_id in wf_runs:
-            workflow_items += f"<li><strong>Workflow Run ID:</strong> <code>{run_id}</code></li>"
-        workflow_html = f'<div class="workflow-info"><h3>Nova Act Workflows</h3><ul>{workflow_items}</ul></div>'
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -559,16 +557,16 @@ def generate_detailed_report(summary: RunSummary, results: list[ScenarioResult])
     background: #e1edf9; padding: 2px 6px; border-radius: 3px;
   }}
 
-  /* Workflow info */
-  .workflow-info {{
-    margin-top: 12px; padding-top: 12px;
-    border-top: 1px solid rgba(255,255,255,0.2);
-    font-size: 0.85em; color: #adb5bd;
+  /* Workflow info (per-scenario) */
+  .scenario-workflow {{
+    padding: 8px 12px; margin-bottom: 12px;
+    background: #f0f2f5; border-radius: 4px;
+    font-size: 0.8em; color: #495057;
+    display: flex; gap: 20px; flex-wrap: wrap;
   }}
-  .workflow-info h3 {{ display: none; }}
-  .workflow-info ul {{ margin: 0; padding: 0; list-style: none; }}
-  .workflow-info li {{ display: inline-block; margin-right: 20px; }}
-  .workflow-info code {{ background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px; color: #e9ecef; }}
+  .scenario-workflow code {{
+    background: #e1e5ea; padding: 2px 6px; border-radius: 3px; font-size: 0.95em;
+  }}
 
   /* Lightbox */
   .lightbox-overlay {{
@@ -592,7 +590,6 @@ def generate_detailed_report(summary: RunSummary, results: list[ScenarioResult])
       <span>Generated: {timestamp}</span>
       <span>Status: <strong>{summary.status}</strong></span>
     </div>
-    {workflow_html}
   </div>
 
   <div class="stats-bar">

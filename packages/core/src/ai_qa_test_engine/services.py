@@ -61,7 +61,7 @@ class TranslationService:
             feature_files = [feature_dir]
             feature_dir = feature_dir.parent
         else:
-            feature_files = sorted(feature_dir.glob("*.feature"))
+            feature_files = sorted(feature_dir.rglob("*.feature"))
         if not feature_files:
             log(f"No .feature files found in {feature_dir}", "warning")
             return []

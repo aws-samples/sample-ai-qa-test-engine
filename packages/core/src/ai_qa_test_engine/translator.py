@@ -167,7 +167,7 @@ def translate_all_features(
             "set DEFAULT_TEST_URL, or provide a tag-url-mapping.json file."
         )
 
-    feature_files = sorted(input_dir.glob("*.feature"))
+    feature_files = sorted(input_dir.rglob("*.feature"))
     if not feature_files:
         raise ValueError(f"No .feature files found in {input_dir}")
 
