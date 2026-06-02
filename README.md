@@ -649,6 +649,26 @@ Variables come from multiple sources and are stored in a unified nested dictiona
 - Dict returns store the whole dict under the key — access fields via `${key.field}`
 - Resolution order: direct key lookup first, then dotted path traversal
 
+**Curly quotes in input variables:**
+
+If your test data contains values with special characters like curly quotes (`"` `"`), smart apostrophes (`'`), or em-dashes (`—`), put them in the variables file. The variable doesn't need to be referenced with `${...}` — it's just a way to inject literal text that the AI uses when filling forms or validating content.
+
+```json
+{
+  "campaign_name": "Summer "Hot Deals" Promo — 2024",
+  "dealer_note": "Customer's preferred contact: "email only""
+}
+```
+
+```gherkin
+Scenario: Verify campaign with special characters
+  Given I am on the campaigns page
+  When I search for the campaign "${campaign_name}"
+  Then I should see the campaign name "${campaign_name}"
+```
+
+This avoids Gherkin parsing issues with curly quotes embedded directly in step text.
+
 ## Trajectory Replay (Speed Up Repeated Runs)
 
 On first run, the engine records browser actions (clicks, scrolls) as trajectory JSON files. On subsequent runs, cached action steps replay without calling the AI model — saving time and API costs.
@@ -705,20 +725,46 @@ The `@max-steps:60` annotation overrides the global default just for that one st
 
 ## Stop on Failure (Interactive Debugging)
 
-When a step fails, the browser stays open so you can inspect the page, edit the `.feature` file to fix the step, then press Enter to re-translate and resume.
+When a step fails, the browser stays open so you can inspect the page, edit the `.feature` file to fix the step, then press Enter to re-translate and resume. **This loops continuously** — if the retry fails again, you get another chance to edit and try again, until all steps pass or you press Ctrl+C.
 
 ```bash
-ai-qa-test run --feature-dir ./features/ --stop-on-failure
+ai-qa-test run --feature-dir ./features/ --stop-on-failure --browser-mode headed
 ```
 
-**Flow:**
+**Flow (loops until success or Ctrl+C):**
 1. Step fails → browser stays open, terminal shows error
-2. You edit the `.feature` file (fix the failing step)
+2. You edit the `.feature` file (fix the failing step, remove it, or adjust later steps)
 3. Press Enter in the terminal
 4. Engine re-translates the feature, detects the first changed step, resumes from there
-5. If the fix works, execution continues to the end
+5. If the retry fails → back to step 1 (loop continues)
+6. If all remaining steps pass → run completes successfully
+7. Ctrl+C at any point → aborts and reports what passed so far
 
-**Note:** The browser state must be compatible with where you're resuming from. If you changed an earlier step, the page might not be in the right state.
+**Example session:**
+```
+Step 4: Then I should see the destination name "Mars"
+  ✗ Validation failed: Expected "Mars" but page shows "Proxima Centauri b"
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+STOPPED ON FAILURE
+Failed at step 4: Then I should see the destination name "Mars"
+Edit your .feature file to fix the issue, then press Enter.
+(Ctrl+C to abort)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+>>> Press Enter after editing .feature file...
+🔄 Re-translating feature file...
+  Change detected at step 4: 'destination name "Mars"' → 'destination name "Proxima Centauri b"'
+  Resuming execution from step 4...
+Step 4: Then I should see the destination name "Proxima Centauri b"
+  ✓ Step 4 passed (5.2s)
+```
+
+**Tips:**
+- Use `--browser-mode headed` so you can see the page state when it fails
+- You can comment out a failing step — the engine detects the change and resumes from where steps diverge
+- You can fix multiple steps in one edit — it resumes from the first changed step
+- The browser state must be compatible with where you're resuming from (it doesn't re-navigate)
 
 ## @include (Reusable Step Sequences)
 
