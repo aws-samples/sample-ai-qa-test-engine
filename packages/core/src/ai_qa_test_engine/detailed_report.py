@@ -265,14 +265,16 @@ def _render_gherkin_step(step: StepResult) -> str:
 
     safe_text = step.original_text.replace("<", "&lt;").replace(">", "&gt;")
 
-    html = f'<div class="gherkin-step {status_class}">'
-    html += f'  <div class="gherkin-step-header">'
+    # Use <details> to make step content collapsible (open by default for failed steps)
+    open_attr = ' open' if step.status in ("FAILED", "ERROR") else ''
+    html = f'<details class="gherkin-step {status_class}"{open_attr}>'
+    html += f'  <summary class="gherkin-step-header">'
     html += f'    <span class="step-status-icon">{status_icon}</span>'
     html += f'    <code class="step-keyword">{step.keyword}</code>'
     html += f'    <span class="step-text">{safe_text}</span>'
     html += f'    <span class="step-duration">{step.duration_seconds:.1f}s</span>'
     html += f'    <span class="step-badge {status_class}">{step.status}</span>'
-    html += f'  </div>'
+    html += f'  </summary>'
 
     if step.error:
         safe_error = step.error.replace("<", "&lt;").replace(">", "&gt;")
@@ -313,7 +315,7 @@ def _render_gherkin_step(step: StepResult) -> str:
         html += f'    <p class="no-trajectory">No trajectory recorded (validation/extraction steps use act_get which does not produce a trajectory)</p>'
         html += f'  </div>'
 
-    html += f'</div>'
+    html += f'</details>'
     return html
 
 
@@ -459,9 +461,11 @@ def generate_detailed_report(summary: RunSummary, results: list[ScenarioResult])
 
   .gherkin-step-header {{
     padding: 12px 16px; display: flex; align-items: center; gap: 10px;
-    background: #f8f9fa; border-bottom: 1px solid #e9ecef;
-    flex-wrap: wrap;
+    background: #f8f9fa; cursor: pointer;
+    flex-wrap: wrap; list-style: none;
   }}
+  .gherkin-step-header::-webkit-details-marker {{ display: none; }}
+  .gherkin-step-header:hover {{ background: #eef0f2; }}
   .step-status-icon {{ font-size: 1.2em; }}
   .step-keyword {{
     background: #232f3e; color: #ff9900; padding: 2px 8px;
