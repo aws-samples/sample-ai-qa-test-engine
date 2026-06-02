@@ -175,11 +175,17 @@ def translate_all_features(
     if not feature_files:
         raise ValueError(f"No .feature files found in {input_dir}")
 
-    # Create translator agent
+    # Create translator agent with high max_tokens for large feature files
     system_prompt = load_agent_prompt()
+
+    from strands.models.bedrock import BedrockModel
+    model = BedrockModel(
+        model_id=bedrock_model_id or "us.anthropic.claude-sonnet-4-20250514-v1:0",
+        max_tokens=16384,
+    )
     agent = Agent(
         name="gherkin_translator",
-        model=bedrock_model_id,
+        model=model,
         system_prompt=system_prompt,
         structured_output_model=Feature,
     )
