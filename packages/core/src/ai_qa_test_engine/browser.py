@@ -46,6 +46,10 @@ def create_browser_session(
     Uses NovaActClient.get_workflow_kwargs() for workflow discovery/creation
     (same as test_translator), then creates NovaActQa with the expect() API.
 
+    The yielded NovaActQa instance has additional attributes:
+        - _workflow_definition_name: str — the workflow definition name
+        - _workflow_run_id: str — the Nova Act workflow run UUID
+
     Args:
         config: Application configuration
         base_url: Starting URL for the browser
@@ -82,4 +86,7 @@ def create_browser_session(
     with Workflow(**workflow_kwargs) as workflow:
         nova_kwargs['workflow'] = workflow
         with NovaActQa(**nova_kwargs) as nova:
+            # Attach workflow metadata for downstream logging
+            nova._workflow_definition_name = workflow_name
+            nova._workflow_run_id = workflow.workflow_run_id
             yield nova
