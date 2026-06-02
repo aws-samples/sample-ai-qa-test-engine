@@ -1,9 +1,10 @@
 """Scenario executor for AgentCore — uses browser_session for remote browser.
 
-Uses ai-qa-test-engine core execution engine with AgentCore's CDP-based
-remote browser instead of local Playwright.
+Uses ai-qa-test-engine core's shared step execution loop with AgentCore's
+CDP-based remote browser instead of local Playwright.
 """
 
+import base64
 import logging
 import os
 import time
@@ -24,6 +25,7 @@ def execute_scenario_agentcore(
     functions_file: Optional[Path] = None,
     input_variables: Optional[dict] = None,
     data_dir: Optional[Path] = None,
+    trajectory_cache_dir: Optional[Path] = None,
 ) -> dict:
     """Execute a single test scenario using ai-qa-test-engine with AgentCore browser.
 
@@ -34,17 +36,22 @@ def execute_scenario_agentcore(
         functions_file: Optional path to custom functions .py file
         input_variables: Optional dict of pre-loaded variables (from variables/ S3 dir)
         data_dir: Optional path to directory containing data files (Excel, CSV) downloaded from S3
+        trajectory_cache_dir: Optional path to trajectory cache directory for replay
 
     Returns:
-        Result dict with status, duration, steps, errors
+        Result dict with status, duration, steps, errors, detailed_report_html
     """
-    from ai_qa_test_engine.models import TestScenario
+    from ai_qa_test_engine.models import TestScenario, StepResult, ScenarioResult, RunSummary
     from ai_qa_test_engine.function_registry import FunctionRegistry
-    from ai_qa_test_engine.executor import _execute_step
     from ai_qa_test_engine.browser import make_workflow_name
     from ai_qa_test_engine.nova_act_client import NovaActClient
     from ai_qa_test_engine.nova_act_qa import NovaActQa
+    from ai_qa_test_engine.trajectory import TrajectoryCache
+    from ai_qa_test_engine.step_loop import execute_steps
+    from ai_qa_test_engine.detailed_report import generate_detailed_report
     from nova_act import Workflow
+    from datetime import datetime, timezone
+    from uuid import uuid4
 
     start_time = time.time()
     scenario = TestScenario.model_validate(scenario_data)
@@ -70,6 +77,12 @@ def execute_scenario_agentcore(
     # Build workflow name
     workflow_name = make_workflow_name(feature_name, scenario_name)
 
+    # Initialize trajectory cache
+    traj_cache = None
+    if trajectory_cache_dir:
+        traj_cache = TrajectoryCache(trajectory_cache_dir)
+        logger.info(f"Trajectory cache: {trajectory_cache_dir}")
+
     # Collect logs
     log_messages = []
 
@@ -90,8 +103,9 @@ def execute_scenario_agentcore(
     if input_variables:
         extracted_values.update(input_variables)
         log_callback(f"Pre-loaded {len(input_variables)} input variable(s): {list(input_variables.keys())}")
-    step_results = []
-    errors = []
+
+    step_results: list[StepResult] = []
+    errors: list[str] = []
 
     # Set working directory to data_dir so relative file paths (Excel, CSV) resolve
     original_cwd = os.getcwd()
@@ -116,65 +130,24 @@ def execute_scenario_agentcore(
                     starting_page=base_url,
                     workflow=workflow,
                     headless=False,
+                    replayable=True,  # Enable trajectory recording for replay cache
                     cdp_endpoint_url=cdp_endpoint_url,
                     cdp_headers=cdp_headers,
                 ) as nova:
-                    for step_idx, step in enumerate(scenario.steps, 1):
-                        keyword = step.original_keyword
-                        text = step.original_text
+                    # Get max_steps from env var (set by config or payload)
+                    _max_steps = int(os.environ.get("MAX_STEPS", "30"))
 
-                        log_callback(f"Step {step_idx}: {keyword} {text}")
-                        step_start = time.time()
-
-                        try:
-                            # Get max_steps from env var (set by config or payload)
-                            _max_steps = int(os.environ.get("MAX_STEPS", "30"))
-                            result = _execute_step(
-                                step, nova, extracted_values, functions, log_callback,
-                                max_steps=_max_steps,
-                            )
-                            step_duration = time.time() - step_start
-
-                            step_results.append({
-                                "number": step_idx,
-                                "keyword": keyword,
-                                "original_text": text,
-                                "status": "PASSED",
-                                "duration_seconds": step_duration,
-                            })
-                            log_callback(f"  ✓ Step {step_idx} passed ({step_duration:.1f}s)")
-
-                        except AssertionError as e:
-                            step_duration = time.time() - step_start
-                            error_msg = str(e)
-                            log_callback(f"  ✗ Validation failed: {error_msg}", "error")
-
-                            step_results.append({
-                                "number": step_idx,
-                                "keyword": keyword,
-                                "original_text": text,
-                                "status": "FAILED",
-                                "duration_seconds": step_duration,
-                                "error": error_msg,
-                            })
-                            errors.append(f"Step {step_idx}: {error_msg}")
-                            break
-
-                        except Exception as e:
-                            step_duration = time.time() - step_start
-                            error_msg = f"Step execution error: {e}"
-                            log_callback(f"  ✗ Error: {error_msg}", "error")
-
-                            step_results.append({
-                                "number": step_idx,
-                                "keyword": keyword,
-                                "original_text": text,
-                                "status": "ERROR",
-                                "duration_seconds": step_duration,
-                                "error": error_msg,
-                            })
-                            errors.append(error_msg)
-                            break
+                    # Use shared step execution loop (same code as local executor)
+                    step_results, errors = execute_steps(
+                        scenario=scenario,
+                        nova=nova,
+                        extracted_values=extracted_values,
+                        functions=functions,
+                        log=log_callback,
+                        traj_cache=traj_cache,
+                        feature_name=feature_name,
+                        max_steps=_max_steps,
+                    )
 
     except Exception as e:
         errors.append(f"Browser session error: {type(e).__name__}: {e}")
@@ -188,14 +161,58 @@ def execute_scenario_agentcore(
 
     # Determine status
     if errors:
-        status = "FAILED" if any(s.get("status") == "FAILED" for s in step_results) else "ERROR"
+        status = "FAILED" if any(s.status == "FAILED" for s in step_results) else "ERROR"
     else:
         status = "PASSED"
 
-    steps_passed = sum(1 for s in step_results if s.get("status") == "PASSED")
-    steps_failed = sum(1 for s in step_results if s.get("status") in ("FAILED", "ERROR"))
+    steps_passed = sum(1 for s in step_results if s.status == "PASSED")
+    steps_failed = sum(1 for s in step_results if s.status in ("FAILED", "ERROR"))
 
     logger.info(f"Scenario {status}: {scenario_name} ({duration:.2f}s)")
+
+    # Generate detailed HTML report
+    detailed_report_html = None
+    try:
+        run_id = f"run-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:6]}"
+        scenario_result = ScenarioResult(
+            scenario_name=scenario_name,
+            feature_name=feature_name,
+            status=status,
+            duration_seconds=duration,
+            steps=step_results,
+            extracted_variables=extracted_values,
+            errors=errors,
+        )
+        run_summary = RunSummary(
+            run_id=run_id,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            total_scenarios=1,
+            passed=1 if status == "PASSED" else 0,
+            failed=1 if status == "FAILED" else 0,
+            errors=1 if status == "ERROR" else 0,
+            total_duration_seconds=duration,
+            status=status,
+            scenarios=[scenario_result],
+        )
+        detailed_report_html = generate_detailed_report(run_summary, [scenario_result])
+        logger.info("Detailed report generated")
+    except Exception as e:
+        logger.warning(f"Failed to generate detailed report: {e}")
+
+    # Build step_results as dicts for JSON serialization
+    step_results_dicts = []
+    for sr in step_results:
+        d = {
+            "number": sr.step_number,
+            "keyword": sr.keyword,
+            "original_text": sr.original_text,
+            "status": sr.status,
+            "duration_seconds": sr.duration_seconds,
+            "replayed_from_cache": sr.replayed_from_cache or False,
+        }
+        if sr.error:
+            d["error"] = sr.error
+        step_results_dicts.append(d)
 
     return {
         "status": status,
@@ -206,6 +223,7 @@ def execute_scenario_agentcore(
         "steps_failed": steps_failed,
         "errors": errors,
         "extracted_variables": extracted_values,
-        "step_results": step_results,
+        "step_results": step_results_dicts,
         "log_messages": log_messages,
+        "detailed_report_html": detailed_report_html,
     }
