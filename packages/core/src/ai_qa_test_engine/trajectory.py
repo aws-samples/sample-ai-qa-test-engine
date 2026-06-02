@@ -96,7 +96,7 @@ class TrajectoryCache:
             "trajectory_file": dest.name,
             "source_file": str(src),
         }
-        with open(self._meta_path(key), "w") as f:
+        with open(self._meta_path(key), "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2)
 
         logger.info(f"Trajectory cached: step {step_index} → {dest.name}")

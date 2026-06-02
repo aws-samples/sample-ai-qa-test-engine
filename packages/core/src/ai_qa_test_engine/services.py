@@ -136,7 +136,7 @@ class TranslationService:
             json_path = cache_dir / f"{f.stem}.json"
             if json_path.exists():
                 # Read the translated data and store with hash
-                with open(json_path) as jf:
+                with open(json_path, encoding="utf-8") as jf:
                     data = json.load(jf)
                 self.cache.put(f, data)
 
@@ -207,7 +207,7 @@ class TestExecutionService:
         for json_file in json_files:
             if not json_file.exists():
                 continue
-            with open(json_file) as f:
+            with open(json_file, encoding="utf-8") as f:
                 data = json.load(f)
             feature = Feature.model_validate(data)
             features.append((json_file.stem, feature))
@@ -336,7 +336,7 @@ class TestExecutionService:
             },
         }
         summary_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(summary_path, "w") as f:
+        with open(summary_path, "w", encoding="utf-8") as f:
             json.dump(summary_dict, f, indent=2)
 
         # Print summary
@@ -377,7 +377,7 @@ class TestExecutionService:
         # Load existing data (append scenarios to same feature file)
         existing = {}
         if filepath.exists():
-            with open(filepath) as f:
+            with open(filepath, encoding="utf-8") as f:
                 existing = json.load(f)
 
         # Generate scenario ID
@@ -395,5 +395,5 @@ class TestExecutionService:
             "variables": result.extracted_variables,
         }
 
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(existing, f, indent=2, default=str)

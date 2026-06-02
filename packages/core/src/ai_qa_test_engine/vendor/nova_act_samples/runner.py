@@ -222,7 +222,7 @@ class TrajectoryRunner:
 
 def load_trajectory(path: str) -> Trajectory:
     """Load a Trajectory from a JSON file path."""
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return Trajectory.model_validate_json(f.read())
 
 

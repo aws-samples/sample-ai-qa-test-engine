@@ -73,7 +73,7 @@ class LocalCacheManager:
 
         json_file = self._json_path(source_path)
         try:
-            with open(json_file) as f:
+            with open(json_file, encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
             return None
@@ -94,7 +94,7 @@ class LocalCacheManager:
 
         # Write JSON (deterministic output for git-friendliness)
         json_file = self._json_path(source_path)
-        with open(json_file, "w") as f:
+        with open(json_file, "w", encoding="utf-8") as f:
             json.dump(feature_data, f, indent=2, sort_keys=False, ensure_ascii=False)
 
         # Write hash

@@ -33,10 +33,10 @@ def _load_trajectory(trajectory_file: str | None) -> dict | None:
         return None
 
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         return data
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         return None
 
 
