@@ -162,12 +162,13 @@ def generate_combined_report(summary: RunSummary, results: list[ScenarioResult])
             screenshot_html = ""
             if step.screenshot:
                 screenshot_html = f'<img src="data:image/png;base64,{step.screenshot}" style="max-width:200px;margin-top:4px;border:1px solid #ccc;border-radius:3px;"/>'
+            cache_icon = "⚡" if step.replayed_from_cache else ""
             step_rows += (
                 f'<tr class="{s_class}">'
                 f'<td>{step.step_number}</td>'
                 f'<td>{step.keyword}</td>'
                 f'<td>{s_text}{s_err}</td>'
-                f'<td>{step.status}</td>'
+                f'<td>{cache_icon}{step.status}</td>'
                 f'<td>{step.duration_seconds:.1f}s</td>'
                 f'<td>{screenshot_html}</td>'
                 f'</tr>'

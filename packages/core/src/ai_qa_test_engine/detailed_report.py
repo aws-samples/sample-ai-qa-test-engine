@@ -269,7 +269,7 @@ def _render_gherkin_step(step: StepResult) -> str:
     open_attr = ' open' if step.status in ("FAILED", "ERROR") else ''
     html = f'<details class="gherkin-step {status_class}"{open_attr}>'
     html += f'  <summary class="gherkin-step-header">'
-    html += f'    <span class="step-status-icon">{status_icon}</span>'
+    html += f'    <span class="step-status-icon">{status_icon}{"⚡" if step.replayed_from_cache else ""}</span>'
     html += f'    <code class="step-keyword">{step.keyword}</code>'
     html += f'    <span class="step-text">{safe_text}</span>'
     html += f'    <span class="step-duration">{step.duration_seconds:.1f}s</span>'

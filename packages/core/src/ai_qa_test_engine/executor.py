@@ -207,11 +207,13 @@ def execute_scenario(
                     # Capture trajectory file path from ActResult (instruction steps)
                     # or from cache replay (stored on nova instance)
                     trajectory_file = None
+                    was_replayed = False
                     if hasattr(result, 'trajectory_file_path') and result.trajectory_file_path:
                         trajectory_file = result.trajectory_file_path
                     elif hasattr(nova, '_last_trajectory_file') and nova._last_trajectory_file:
                         trajectory_file = nova._last_trajectory_file
                         nova._last_trajectory_file = None  # Reset after capture
+                        was_replayed = True
 
                     step_results.append(StepResult(
                         step_number=step_idx,
@@ -221,6 +223,7 @@ def execute_scenario(
                         duration_seconds=step_duration,
                         extracted_value=result,
                         trajectory_file=trajectory_file,
+                        replayed_from_cache=was_replayed,
                     ))
                     log(f"  ✓ Step {step_idx} passed ({step_duration:.1f}s)")
 

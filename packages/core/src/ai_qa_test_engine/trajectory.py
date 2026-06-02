@@ -151,7 +151,7 @@ def replay_cached_trajectory(nova, trajectory_path: Path, strict: bool = False) 
         True if replay succeeded, False if it failed (fallback to act())
     """
     try:
-        from examples.trajectory.trajectory_replay.runner import (
+        from ai_qa_test_engine.vendor.nova_act_samples.runner import (
             load_trajectory,
             replay_trajectory,
         )
@@ -163,8 +163,8 @@ def replay_cached_trajectory(nova, trajectory_path: Path, strict: bool = False) 
 
     except ImportError:
         logger.warning(
-            "nova-act-samples trajectory_replay module not available. "
-            "Install nova-act-samples or add it to PYTHONPATH for replay support. "
+            "Trajectory replay dependencies not available. "
+            "Ensure nova-act SDK is installed with trajectory support. "
             "Falling back to Nova Act."
         )
         return False

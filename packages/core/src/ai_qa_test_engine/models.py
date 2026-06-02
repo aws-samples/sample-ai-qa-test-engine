@@ -182,6 +182,7 @@ class StepResult:
     prompt_sent: str | None = None  # The actual prompt/instruction sent to Nova Act
     screenshot_after: str | None = None  # base64 PNG after step (for detailed report)
     trajectory_file: str | None = None  # Path to Nova Act trajectory JSON (for detailed report)
+    replayed_from_cache: bool = False  # True if step was replayed from trajectory cache
 
 
 @dataclass
