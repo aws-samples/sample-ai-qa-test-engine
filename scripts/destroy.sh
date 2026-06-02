@@ -51,20 +51,42 @@ if [ "$FORCE" != true ]; then
     fi
 fi
 
+# --- Helper: fully empty a bucket (including all object versions and delete markers) ---
+empty_versioned_bucket() {
+    local bucket="$1"
+    # Remove current objects
+    aws s3 rm "s3://${bucket}" --recursive --region "$REGION" 2>/dev/null || true
+    # Remove all object versions
+    aws s3api list-object-versions --bucket "$bucket" --region "$REGION" \
+        --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' --output json 2>/dev/null | \
+        python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if data and data.get('Objects'):
+    print(json.dumps(data))
+else:
+    sys.exit(1)
+" 2>/dev/null | \
+        aws s3api delete-objects --bucket "$bucket" --region "$REGION" --delete file:///dev/stdin 2>/dev/null || true
+    # Remove all delete markers
+    aws s3api list-object-versions --bucket "$bucket" --region "$REGION" \
+        --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' --output json 2>/dev/null | \
+        python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if data and data.get('Objects'):
+    print(json.dumps(data))
+else:
+    sys.exit(1)
+" 2>/dev/null | \
+        aws s3api delete-objects --bucket "$bucket" --region "$REGION" --delete file:///dev/stdin 2>/dev/null || true
+}
+
 echo ""
-echo "🗑️  Emptying S3 buckets..."
-aws s3 rm "s3://${TEST_BUCKET}" --recursive --region "$REGION" 2>/dev/null || true
-aws s3 rm "s3://${DEPLOY_BUCKET}" --recursive --region "$REGION" 2>/dev/null || true
-aws s3 rm "s3://${LOGS_BUCKET}" --recursive --region "$REGION" 2>/dev/null || true
-
-# Handle versioned bucket (TestDataBucket now has versioning enabled)
-aws s3api list-object-versions --bucket "$TEST_BUCKET" --region "$REGION" \
-    --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' --output json 2>/dev/null | \
-    aws s3api delete-objects --bucket "$TEST_BUCKET" --region "$REGION" --delete file:///dev/stdin 2>/dev/null || true
-aws s3api list-object-versions --bucket "$TEST_BUCKET" --region "$REGION" \
-    --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' --output json 2>/dev/null | \
-    aws s3api delete-objects --bucket "$TEST_BUCKET" --region "$REGION" --delete file:///dev/stdin 2>/dev/null || true
-
+echo "🗑️  Emptying S3 buckets (including versioned objects)..."
+empty_versioned_bucket "$TEST_BUCKET"
+empty_versioned_bucket "$DEPLOY_BUCKET"
+empty_versioned_bucket "$LOGS_BUCKET"
 echo "  ✓ Buckets emptied"
 
 echo ""
@@ -72,18 +94,39 @@ echo "🗑️  Deleting CloudFormation stack..."
 aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION"
 echo "  Waiting for delete..."
 aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$REGION" 2>/dev/null || {
-    echo "  ⚠️  Delete may have failed. Retrying with --retain-resources for custom resources..."
+    echo "  ⚠️  Initial delete failed. Retrying with retained custom resources..."
     aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION" \
         --retain-resources TriggerTestRunnerBuild TriggerOrchestratorBuild 2>/dev/null || true
-    aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$REGION" 2>/dev/null || true
+    aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$REGION" 2>/dev/null || {
+        echo "  ⚠️  Still failing. Force-deleting stack..."
+        aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION" \
+            --deletion-mode FORCE_DELETE_STACK 2>/dev/null || true
+        aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$REGION" 2>/dev/null || true
+    }
 }
 echo "  ✓ Stack deleted"
+
+# --- Clean up any ghost stack left in REVIEW_IN_PROGRESS state (from failed prior deploys) ---
+GHOST_STATUS=$(aws cloudformation list-stacks --region "$REGION" \
+    --stack-status-filter REVIEW_IN_PROGRESS CREATE_FAILED ROLLBACK_COMPLETE \
+    --query "StackSummaries[?StackName=='${STACK_NAME}'].StackStatus" --output text 2>/dev/null || true)
+if [ -n "$GHOST_STATUS" ]; then
+    echo ""
+    echo "🗑️  Cleaning up ghost stack (status: $GHOST_STATUS)..."
+    aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION" 2>/dev/null || true
+    aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$REGION" 2>/dev/null || true
+    echo "  ✓ Ghost stack removed"
+fi
 
 echo ""
 echo "🗑️  Removing deploy bucket..."
 aws s3 rb "s3://${DEPLOY_BUCKET}" --force --region "$REGION" 2>/dev/null || true
 echo "  ✓ Deploy bucket removed"
 
+echo "🗑️  Removing access logs bucket..."
+aws s3 rb "s3://${LOGS_BUCKET}" --force --region "$REGION" 2>/dev/null || true
+echo "  ✓ Access logs bucket removed"
+
 echo ""
-echo "✓ All resources destroyed."
+echo "✅ All resources destroyed. Ready for clean redeploy."
 echo "=============================================="
