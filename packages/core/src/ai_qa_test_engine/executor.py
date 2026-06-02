@@ -205,15 +205,17 @@ def execute_scenario(
                     step_duration = time.time() - step_start
 
                     # Capture trajectory file path from ActResult (instruction steps)
-                    # or from cache replay (stored on nova instance)
+                    # or from act_get fallback (stored on nova instance)
                     trajectory_file = None
                     was_replayed = False
                     if hasattr(result, 'trajectory_file_path') and result.trajectory_file_path:
                         trajectory_file = result.trajectory_file_path
                     elif hasattr(nova, '_last_trajectory_file') and nova._last_trajectory_file:
                         trajectory_file = nova._last_trajectory_file
+                        # Check if this was an actual cache replay (set by replay path)
+                        was_replayed = getattr(nova, '_last_was_replay', False)
                         nova._last_trajectory_file = None  # Reset after capture
-                        was_replayed = True
+                        nova._last_was_replay = False
 
                     step_results.append(StepResult(
                         step_number=step_idx,
@@ -427,6 +429,7 @@ def _execute_step(step, nova, extracted_values: dict, functions: FunctionRegistr
                     log(f"  → Replay successful (no AI model call)")
                     # Store trajectory path for detailed report access
                     nova._last_trajectory_file = str(cached_path)
+                    nova._last_was_replay = True
                     return None  # Replay doesn't return ActResult
 
         # No cache hit or replay failed — execute via Nova Act
