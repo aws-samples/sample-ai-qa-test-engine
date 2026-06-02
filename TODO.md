@@ -1,7 +1,6 @@
 # TODO
 
 ## CLI Improvements
-- [ ] Support multiple `--feature-dir` paths (run specific files without running entire directory)
 - [ ] Add `--work-dir` flag to set base directory for all output (translated, trajectories, reports, recordings, extracted_variables)
 - [ ] Document `--feature-dir` accepts both a directory and a single file in README
 - [ ] PII masking in execution logs (mask secrets, passwords, emails in log output)
