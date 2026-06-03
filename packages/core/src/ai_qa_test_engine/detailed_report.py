@@ -316,6 +316,94 @@ def _render_gherkin_step(step: StepResult) -> str:
         html += f'  </div>'
 
     html += f'</details>'
+
+    # Render sub-actions from custom functions
+    if step.sub_actions:
+        html_parts = [f'<details class="gherkin-step {status_class}">']
+        html_parts.append(f'  <summary class="sub-actions-header">🔧 Function sub-actions ({len(step.sub_actions)} captured)</summary>')
+        html_parts.append(f'  <div class="sub-actions-container">')
+        for i, action in enumerate(step.sub_actions, 1):
+            action_type = action.get("action_type", "act")
+            instruction = action.get("instruction", "").replace("<", "&lt;").replace(">", "&gt;")
+            duration = action.get("duration_seconds", 0)
+            icon = "🎯" if action_type == "act" else "🔍"
+            html_parts.append(f'    <div class="sub-action">')
+            html_parts.append(f'      <div class="sub-action-header">{icon} Sub-step {i}: <code>{instruction}</code> ({duration:.1f}s)</div>')
+            # Show trajectory if available
+            traj_file = action.get("trajectory_file")
+            if traj_file:
+                traj_data = _load_trajectory(traj_file)
+                if traj_data:
+                    traj_steps = traj_data.get("steps", [])
+                    if traj_steps:
+                        html_parts.append(_render_trajectory_steps(traj_steps))
+            # Show screenshot
+            screenshot = action.get("screenshot")
+            if screenshot:
+                html_parts.append(f'      <div class="traj-screenshot">')
+                html_parts.append(f'        <img src="data:image/png;base64,{screenshot}" class="traj-img" onclick="openLightbox(this.src)"/>')
+                html_parts.append(f'      </div>')
+            html_parts.append(f'    </div>')
+        html_parts.append(f'  </div>')
+        html_parts.append(f'</details>')
+        html += "\n".join(html_parts)
+
+    return html
+
+
+def _render_step_with_retries(attempts: list) -> str:
+    """Render a step that had multiple attempts (retry timeline).
+
+    Shows all failed attempts collapsed, with the final attempt (pass or fail) prominent.
+    """
+    step_num = attempts[0].step_number
+    keyword = attempts[0].keyword
+    final = attempts[-1]
+
+    status_class = "step-passed" if final.status == "PASSED" else "step-failed"
+    status_icon = "✓" if final.status == "PASSED" else "✗"
+    safe_text = final.original_text.replace("<", "&lt;").replace(">", "&gt;")
+
+    html = f'<details class="gherkin-step {status_class} has-retries" open>'
+    html += f'  <summary class="gherkin-step-header">'
+    html += f'    <span class="step-status-icon">{status_icon}</span>'
+    html += f'    <code class="step-keyword">{keyword}</code>'
+    html += f'    <span class="step-text">{safe_text}</span>'
+    html += f'    <span class="step-duration">{final.duration_seconds:.1f}s</span>'
+    html += f'    <span class="step-badge {status_class}">{final.status}</span>'
+    html += f'    <span class="retry-badge">🔄 {len(attempts)} attempts</span>'
+    html += f'  </summary>'
+
+    # Render timeline of attempts
+    html += f'  <div class="retry-timeline">'
+    for i, attempt in enumerate(attempts, 1):
+        a_icon = "✓" if attempt.status == "PASSED" else "✗"
+        a_class = "attempt-passed" if attempt.status == "PASSED" else "attempt-failed"
+        html += f'    <div class="retry-attempt {a_class}">'
+        html += f'      <span class="attempt-label">{a_icon} Attempt {i}</span>'
+        html += f'      <span class="attempt-duration">{attempt.duration_seconds:.1f}s</span>'
+        if attempt.error:
+            safe_err = attempt.error.replace("<", "&lt;").replace(">", "&gt;")[:200]
+            html += f'      <div class="attempt-error">{safe_err}</div>'
+        if attempt.screenshot:
+            html += (
+                f'      <img src="data:image/png;base64,{attempt.screenshot}" '
+                f'class="traj-img attempt-screenshot" onclick="openLightbox(this.src)"/>'
+            )
+        html += f'    </div>'
+    html += f'  </div>'
+
+    # Render final attempt's trajectory/details (full render)
+    if final.status == "PASSED" and final.trajectory_file:
+        trajectory_data = _load_trajectory(final.trajectory_file)
+        if trajectory_data:
+            trajectory_steps = trajectory_data.get("steps", [])
+            if trajectory_steps:
+                html += f'  <div class="trajectory-container">'
+                html += _render_trajectory_steps(trajectory_steps)
+                html += f'  </div>'
+
+    html += f'</details>'
     return html
 
 
@@ -334,7 +422,24 @@ def _render_scenario(result: ScenarioResult) -> str:
         "ERROR": "scenario-error",
     }.get(result.status, "scenario-error")
 
-    steps_html = "\n".join(_render_gherkin_step(step) for step in result.steps)
+    # Group steps by step_number to show retry history
+    from collections import defaultdict
+    step_groups: dict[int, list] = defaultdict(list)
+    for step in result.steps:
+        step_groups[step.step_number].append(step)
+
+    # Render steps with retry timeline
+    steps_html_parts = []
+    for step_num in sorted(step_groups.keys()):
+        attempts = step_groups[step_num]
+        if len(attempts) == 1:
+            # Single attempt — render normally
+            steps_html_parts.append(_render_gherkin_step(attempts[0]))
+        else:
+            # Multiple attempts — render as timeline
+            steps_html_parts.append(_render_step_with_retries(attempts))
+
+    steps_html = "\n".join(steps_html_parts)
 
     # Per-scenario workflow info
     wf_html = ""

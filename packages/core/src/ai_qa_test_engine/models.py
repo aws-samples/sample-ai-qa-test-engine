@@ -183,6 +183,9 @@ class StepResult:
     screenshot_after: str | None = None  # base64 PNG after step (for detailed report)
     trajectory_file: str | None = None  # Path to Nova Act trajectory JSON (for detailed report)
     replayed_from_cache: bool = False  # True if step was replayed from trajectory cache
+    attempt: int = 1  # Attempt number (1 = first try, 2+ = retries via stop-on-failure)
+    is_retry: bool = False  # True if this result is from a stop-on-failure retry
+    sub_actions: list[dict] | None = None  # Captured sub-actions from custom functions using nova_act
 
 
 @dataclass
