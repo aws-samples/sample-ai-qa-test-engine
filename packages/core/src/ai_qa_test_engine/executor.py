@@ -529,7 +529,6 @@ def _handle_stop_on_failure(
                         reports_dir.mkdir(parents=True, exist_ok=True)
                         screenshot_path = reports_dir / f"debug_screenshot_step{current_fail_idx}.png"
                         screenshot_path.write_bytes(screenshot_bytes)
-                        log(f"  📸 Screenshot saved: {screenshot_path.resolve()}", "info")
                         print(f"\n  📸 Screenshot saved: {screenshot_path.resolve()}\n")
                     else:
                         print("\n  ⚠️  Could not capture screenshot\n")
@@ -578,11 +577,9 @@ def _handle_stop_on_failure(
                 reports_dir.mkdir(parents=True, exist_ok=True)
                 report_path = reports_dir / f"{run_id}_partial.html"
                 report_path.write_text(html, encoding="utf-8")
-                log(f"  📊 Partial report saved: {report_path.resolve()}", "info")
                 print(f"\n  📊 Partial report saved: {report_path.resolve()}\n")
                 input("  Press Enter to continue...")
             except Exception as e:
-                log(f"  ⚠️  Report generation failed: {e}", "error")
                 print(f"\n  ⚠️  Report generation failed: {e}\n")
                 input("  Press Enter to continue...")
             continue
