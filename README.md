@@ -725,46 +725,78 @@ The `@max-steps:60` annotation overrides the global default just for that one st
 
 ## Stop on Failure (Interactive Debugging)
 
-When a step fails, the browser stays open so you can inspect the page, edit the `.feature` file to fix the step, then press Enter to re-translate and resume. **This loops continuously** — if the retry fails again, you get another chance to edit and try again, until all steps pass or you press Ctrl+C.
+When a step fails, the browser stays open and an interactive debug menu appears. This loops continuously until all steps pass or you abort.
 
 ```bash
 ai-qa-test run --feature-dir ./features/ --stop-on-failure --browser-mode headed
 ```
 
-**Flow (loops until success or Ctrl+C):**
-1. Step fails → browser stays open, terminal shows error
-2. You edit the `.feature` file (fix the failing step, remove it, or adjust later steps)
-3. Press Enter in the terminal
-4. Engine re-translates the feature, detects the first changed step, resumes from there
-5. If the retry fails → back to step 1 (loop continues)
-6. If all remaining steps pass → run completes successfully
-7. Ctrl+C at any point → aborts and reports what passed so far
+### Debug Menu
 
-**Example session:**
+On failure, you get an arrow-key navigable menu (works on Windows, macOS, Linux):
+
 ```
-Step 4: Then I should see the destination name "Mars"
-  ✗ Validation failed: Expected "Mars" but page shows "Proxima Centauri b"
+  ✗ Step 4 failed: Then I should see the destination name "Mars"
+  Error: Expected "Mars" but page shows "Proxima Centauri b"
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-STOPPED ON FAILURE
-Failed at step 4: Then I should see the destination name "Mars"
-Edit your .feature file to fix the issue, then press Enter.
-(Ctrl+C to abort)
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
->>> Press Enter after editing .feature file...
-🔄 Re-translating feature file...
-  Change detected at step 4: 'destination name "Mars"' → 'destination name "Proxima Centauri b"'
-  Resuming execution from step 4...
-Step 4: Then I should see the destination name "Proxima Centauri b"
-  ✓ Step 4 passed (5.2s)
+  What would you like to do?
+  > ▶ Retry (re-translate and resume)
+    📊 Save report (export progress so far)
+    🔍 Show current variables
+    📸 Take screenshot of current page
+    🛑 Abort
 ```
+
+| Option | What it does |
+|--------|--------------|
+| **Retry** | Re-translates the `.feature` file, detects changes, resumes from the first changed step |
+| **Save report** | Generates a partial HTML report with all steps so far (including failed attempts) — send this to an expert |
+| **Show variables** | Dumps all current `${variable}` values for debugging |
+| **Take screenshot** | Saves the current browser page state to `reports/` |
+| **Abort** | Stops execution and reports what passed |
+
+### Retry History in Reports
+
+Every retry attempt is preserved in the detailed HTML report as a timeline:
+
+```
+Step 4: Then I should see "Mars"  [🔄 3 attempts]
+  ├─ Attempt 1: ✗ FAILED — Expected "Mars" got "Proxima Centauri b" [screenshot]
+  ├─ Attempt 2: ✗ FAILED — Expected "Mars" got "Proxima" [screenshot]
+  └─ Attempt 3: ✓ PASSED (5.2s)
+```
+
+This gives you (or the expert you send the report to) full visibility into what was tried.
+
+### Flow
+
+1. Step fails → debug menu appears
+2. Edit your `.feature` file, then select **Retry**
+3. Engine re-translates, detects the first changed step, resumes from there
+4. If the retry fails → back to the menu (loop continues)
+5. If all remaining steps pass → run completes successfully
+6. Select **Save report** at any point to export progress without stopping
 
 **Tips:**
 - Use `--browser-mode headed` so you can see the page state when it fails
 - You can comment out a failing step — the engine detects the change and resumes from where steps diverge
 - You can fix multiple steps in one edit — it resumes from the first changed step
+- Select **Show variables** to verify `${variable}` substitutions before retrying
 - The browser state must be compatible with where you're resuming from (it doesn't re-navigate)
+
+### Custom Function Sub-Actions in Reports
+
+When a custom function calls `nova_act.act()` internally (e.g., `enter_credentials`), those sub-actions are automatically captured with screenshots and trajectory data:
+
+```
+Step 2: When I call enter_credentials(env="test")
+  🔧 Function sub-actions (3 captured)
+  ├─ Sub-step 1: Type "user@example.com" into email field [screenshot]
+  ├─ Sub-step 2: Type "password123" into password field [screenshot]
+  └─ Sub-step 3: Click "Sign In" button [screenshot + trajectory]
+```
+
+No changes needed to your custom functions — the capture is automatic via monkey-patching when the function receives `nova_act` as a parameter.
 
 ## @include (Reusable Step Sequences)
 
