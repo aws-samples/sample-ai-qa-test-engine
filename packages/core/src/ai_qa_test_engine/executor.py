@@ -486,6 +486,7 @@ def _handle_stop_on_failure(
 
         elif choice == SHOW_VARIABLES:
             display_variables(extracted_values, log)
+            input("\n  Press Enter to continue...")
             continue
 
         elif choice == TAKE_SCREENSHOT:
@@ -495,19 +496,20 @@ def _handle_stop_on_failure(
                 if page:
                     screenshot_bytes = page.screenshot()
                     if screenshot_bytes:
-                        # Save to reports dir
                         from pathlib import Path
-                        reports_dir = Path("reports")
-                        reports_dir.mkdir(exist_ok=True)
+                        reports_dir = config.resolve_report_dir()
+                        reports_dir.mkdir(parents=True, exist_ok=True)
                         screenshot_path = reports_dir / f"debug_screenshot_step{current_fail_idx}.png"
                         screenshot_path.write_bytes(screenshot_bytes)
-                        log(f"  📸 Screenshot saved: {screenshot_path}", "info")
+                        log(f"  📸 Screenshot saved: {screenshot_path.resolve()}", "info")
+                        print(f"\n  📸 Screenshot saved: {screenshot_path.resolve()}\n")
                     else:
-                        log("  ⚠️  Could not capture screenshot", "error")
+                        print("\n  ⚠️  Could not capture screenshot\n")
                 else:
-                    log("  ⚠️  No page available", "error")
+                    print("\n  ⚠️  No page available\n")
             except Exception as e:
-                log(f"  ⚠️  Screenshot failed: {e}", "error")
+                print(f"\n  ⚠️  Screenshot failed: {e}\n")
+            input("  Press Enter to continue...")
             continue
 
         elif choice == SAVE_REPORT:
@@ -544,13 +546,17 @@ def _handle_stop_on_failure(
                 )
                 html = generate_detailed_report(run_summary, [scenario_result])
 
-                reports_dir = Path("reports")
-                reports_dir.mkdir(exist_ok=True)
+                reports_dir = config.resolve_report_dir()
+                reports_dir.mkdir(parents=True, exist_ok=True)
                 report_path = reports_dir / f"{run_id}_partial.html"
                 report_path.write_text(html, encoding="utf-8")
-                log(f"  📊 Partial report saved: {report_path}", "info")
+                log(f"  📊 Partial report saved: {report_path.resolve()}", "info")
+                print(f"\n  📊 Partial report saved: {report_path.resolve()}\n")
+                input("  Press Enter to continue...")
             except Exception as e:
                 log(f"  ⚠️  Report generation failed: {e}", "error")
+                print(f"\n  ⚠️  Report generation failed: {e}\n")
+                input("  Press Enter to continue...")
             continue
 
         elif choice == RETRY:

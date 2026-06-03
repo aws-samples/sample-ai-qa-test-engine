@@ -131,24 +131,24 @@ def _show_menu_fallback() -> str:
 
 def display_variables(extracted_values: dict, log: Callable[[str, str], None]) -> None:
     """Pretty-print the current variable state."""
-    log("\n  ┌─────────────────────────────────────", "info")
-    log("  │ Current Variables", "info")
-    log("  ├─────────────────────────────────────", "info")
+    print("\n  ┌─────────────────────────────────────")
+    print("  │ Current Variables")
+    print("  ├─────────────────────────────────────")
 
     if not extracted_values:
-        log("  │  (none)", "info")
+        print("  │  (none)")
     else:
         for key, value in sorted(extracted_values.items()):
             if isinstance(value, dict):
-                log(f"  │  {key}:", "info")
+                print(f"  │  {key}:")
                 for k, v in value.items():
                     display_val = _truncate(str(v), 60)
-                    log(f"  │    .{k} = {display_val}", "info")
+                    print(f"  │    .{k} = {display_val}")
             else:
                 display_val = _truncate(str(value), 70)
-                log(f"  │  {key} = {display_val}", "info")
+                print(f"  │  {key} = {display_val}")
 
-    log("  └─────────────────────────────────────", "info")
+    print("  └─────────────────────────────────────")
 
 
 def _truncate(s: str, max_len: int) -> str:
