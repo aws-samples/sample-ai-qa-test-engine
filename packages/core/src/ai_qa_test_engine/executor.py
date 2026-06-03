@@ -458,8 +458,8 @@ def _handle_stop_on_failure(
     from ai_qa_test_engine.translator import translate_all_features
     from ai_qa_test_engine.models import Feature
     from ai_qa_test_engine.debug_menu import (
-        show_debug_menu, display_variables,
-        RETRY, SAVE_REPORT, SHOW_VARIABLES, TAKE_SCREENSHOT, ABORT,
+        show_debug_menu, display_variables, save_variables,
+        RETRY, SAVE_REPORT, SHOW_VARIABLES, SAVE_VARIABLES, RELOAD_VARIABLES, TAKE_SCREENSHOT, ABORT,
     )
 
     current_fail_idx = step_idx
@@ -487,6 +487,34 @@ def _handle_stop_on_failure(
         elif choice == SHOW_VARIABLES:
             display_variables(extracted_values, log)
             input("\n  Press Enter to continue...")
+            continue
+
+        elif choice == SAVE_VARIABLES:
+            try:
+                saved_path = save_variables(extracted_values, config.resolve_report_dir())
+                print(f"\n  💾 Variables saved: {saved_path}\n")
+            except Exception as e:
+                print(f"\n  ⚠️  Failed to save variables: {e}\n")
+            input("  Press Enter to continue...")
+            continue
+
+        elif choice == RELOAD_VARIABLES:
+            try:
+                import json as _json
+                if config.input_variables_file:
+                    vars_path = config._resolve_path(config.input_variables_file)
+                    if vars_path.exists():
+                        with open(vars_path, encoding="utf-8") as f:
+                            reloaded = _json.load(f)
+                        extracted_values.update(reloaded)
+                        print(f"\n  🔄 Reloaded {len(reloaded)} variable(s) from {vars_path.name}\n")
+                    else:
+                        print(f"\n  ⚠️  Variables file not found: {vars_path}\n")
+                else:
+                    print("\n  ⚠️  No --variables-file configured\n")
+            except Exception as e:
+                print(f"\n  ⚠️  Failed to reload variables: {e}\n")
+            input("  Press Enter to continue...")
             continue
 
         elif choice == TAKE_SCREENSHOT:

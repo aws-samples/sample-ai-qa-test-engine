@@ -14,6 +14,8 @@ from typing import Any, Callable, Optional
 RETRY = "retry"
 SAVE_REPORT = "save_report"
 SHOW_VARIABLES = "show_variables"
+SAVE_VARIABLES = "save_variables"
+RELOAD_VARIABLES = "reload_variables"
 TAKE_SCREENSHOT = "take_screenshot"
 ABORT = "abort"
 
@@ -21,6 +23,8 @@ MENU_CHOICES = [
     (RETRY, "▶ Retry (re-translate and resume)"),
     (SAVE_REPORT, "📊 Save report (export progress so far)"),
     (SHOW_VARIABLES, "🔍 Show current variables"),
+    (SAVE_VARIABLES, "💾 Save variables to file"),
+    (RELOAD_VARIABLES, "🔄 Reload input variables (re-read JSON file)"),
     (TAKE_SCREENSHOT, "📸 Take screenshot of current page"),
     (ABORT, "🛑 Abort"),
 ]
@@ -101,7 +105,7 @@ def _show_menu_prompt_toolkit() -> str:
 
     while True:
         try:
-            answer = prompt("  Enter choice (1-5): ").strip()
+            answer = prompt("  Enter choice (1-7): ").strip()
             idx = int(answer) - 1
             if 0 <= idx < len(MENU_CHOICES):
                 return MENU_CHOICES[idx][0]
@@ -118,19 +122,19 @@ def _show_menu_fallback() -> str:
 
     while True:
         try:
-            answer = input("  Enter choice (1-5): ").strip()
+            answer = input("  Enter choice (1-7): ").strip()
             if answer.lower() in ("q", "quit", "abort"):
                 return ABORT
             idx = int(answer) - 1
             if 0 <= idx < len(MENU_CHOICES):
                 return MENU_CHOICES[idx][0]
-            print("  Invalid choice. Enter 1-5.")
+            print("  Invalid choice. Enter 1-7.")
         except (ValueError, EOFError, KeyboardInterrupt):
             return ABORT
 
 
 def display_variables(extracted_values: dict, log: Callable[[str, str], None]) -> None:
-    """Pretty-print the current variable state."""
+    """Pretty-print the current variable state as formatted JSON."""
     print("\n  ┌─────────────────────────────────────")
     print("  │ Current Variables")
     print("  ├─────────────────────────────────────")
@@ -138,17 +142,36 @@ def display_variables(extracted_values: dict, log: Callable[[str, str], None]) -
     if not extracted_values:
         print("  │  (none)")
     else:
-        for key, value in sorted(extracted_values.items()):
-            if isinstance(value, dict):
-                print(f"  │  {key}:")
-                for k, v in value.items():
-                    display_val = _truncate(str(v), 60)
-                    print(f"  │    .{k} = {display_val}")
-            else:
-                display_val = _truncate(str(value), 70)
-                print(f"  │  {key} = {display_val}")
+        formatted = json.dumps(extracted_values, indent=2, ensure_ascii=False, default=str)
+        for line in formatted.splitlines():
+            print(f"  │  {line}")
 
     print("  └─────────────────────────────────────")
+
+
+def save_variables(extracted_values: dict, output_dir: Any) -> str:
+    """Save current variables to a JSON file and return the path.
+
+    Args:
+        extracted_values: Current variable state
+        output_dir: Path to output directory (typically config.resolve_report_dir())
+
+    Returns:
+        Absolute path string of the saved file
+    """
+    from pathlib import Path
+    from datetime import datetime, timezone
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
+    filepath = out_dir / f"variables_{timestamp}.json"
+    filepath.write_text(
+        json.dumps(extracted_values, indent=2, ensure_ascii=False, default=str),
+        encoding="utf-8",
+    )
+    return str(filepath.resolve())
 
 
 def _truncate(s: str, max_len: int) -> str:
