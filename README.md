@@ -2,6 +2,10 @@
 
 AI-powered QA test execution engine using Nova Act browser automation. Translates Gherkin feature files into executable tests using AI, then runs them with natural language browser automation.
 
+## Architecture
+
+![AI QA Test Engine Architecture](ai-qa-test-engine-arch.png)
+
 ## Quick Start
 
 ```bash
@@ -331,6 +335,7 @@ All CLI options can also be set via environment variables (in `.env` or exported
 | `ENABLE_VIDEO_RECORDING` | `--video` | `true`/`false` |
 | `NO_CACHE` | `--no-cache` | `true`/`false` |
 | `TRAJECTORY_STRICT` | `--trajectory-strict` | `true`/`false` |
+| `IGNORE_HTTPS_ERRORS` | — | `true`/`false` — skip TLS certificate validation (default: `true` in AgentCore, `false` locally) |
 | `MAX_STEPS` | `--max-steps` | Max steps per act() call (default: 30) |
 | `CUSTOM_FUNCTIONS_FILE` | `--functions-file` | Path to .py file or directory |
 | `TAG_URL_MAP_FILE` | `--tag-url-map-file` | Path to mapping JSON |

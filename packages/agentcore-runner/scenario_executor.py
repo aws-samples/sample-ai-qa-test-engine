@@ -15,6 +15,10 @@ from bedrock_agentcore.tools.browser_client import browser_session
 
 logger = logging.getLogger(__name__)
 
+# Enable verbose logging for AgentCore browser SDK and Nova Act
+logging.getLogger("bedrock_agentcore").setLevel(logging.DEBUG)
+logging.getLogger("nova_act").setLevel(logging.DEBUG)
+
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 
@@ -133,6 +137,7 @@ def execute_scenario_agentcore(
                     replayable=True,  # Enable trajectory recording for replay cache
                     cdp_endpoint_url=cdp_endpoint_url,
                     cdp_headers=cdp_headers,
+                    ignore_https_errors=os.environ.get("IGNORE_HTTPS_ERRORS", "true").lower() == "true",
                 ) as nova:
                     # Get max_steps from env var (set by config or payload)
                     _max_steps = int(os.environ.get("MAX_STEPS", "30"))
@@ -150,8 +155,13 @@ def execute_scenario_agentcore(
                     )
 
     except Exception as e:
+        import traceback
         errors.append(f"Browser session error: {type(e).__name__}: {e}")
-        logger.error(f"Browser session error: {e}")
+        logger.error(f"Browser session error: {type(e).__name__}: {e}")
+        logger.error(f"Traceback:\n{traceback.format_exc()}")
+        logger.error(f"  base_url={base_url}")
+        logger.error(f"  browser_id={os.environ.get('BROWSER_IDENTIFIER', 'default')}")
+        logger.error(f"  region={AWS_REGION}")
     finally:
         # Restore original working directory
         if data_dir:

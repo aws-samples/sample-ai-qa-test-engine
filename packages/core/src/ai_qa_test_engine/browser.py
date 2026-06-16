@@ -69,10 +69,12 @@ def create_browser_session(
     headless = config.browser_mode == "headless"
 
     # Build NovaActQa kwargs
+    ignore_https = os.environ.get("IGNORE_HTTPS_ERRORS", "false").lower() == "true"
     nova_kwargs = {
         'starting_page': base_url,
         'headless': headless,
         'replayable': True,  # Enable trajectory recording for replay cache
+        'ignore_https_errors': ignore_https,
     }
 
     # Video recording
