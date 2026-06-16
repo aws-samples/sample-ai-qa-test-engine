@@ -731,3 +731,18 @@ document.addEventListener('keydown', function(e) {{
 </script>
 </body>
 </html>"""
+
+
+def write_report(html: str, output_path: Path) -> Path:
+    """Write HTML report to file.
+
+    Args:
+        html: HTML content
+        output_path: Path to write the report
+
+    Returns:
+        Path to the written file
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(html, encoding="utf-8")
+    return output_path

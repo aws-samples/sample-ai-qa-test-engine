@@ -17,12 +17,7 @@ from ai_qa_test_engine.config import AppConfig
 from ai_qa_test_engine.executor import execute_scenario
 from ai_qa_test_engine.function_registry import FunctionRegistry
 from ai_qa_test_engine.models import Feature, RunSummary, ScenarioResult
-from ai_qa_test_engine.reporter import (
-    generate_combined_report,
-    generate_scenario_html,
-    write_report,
-)
-from ai_qa_test_engine.detailed_report import generate_detailed_report
+from ai_qa_test_engine.detailed_report import generate_detailed_report, write_report
 from ai_qa_test_engine.translator import translate_all_features
 
 
@@ -298,17 +293,11 @@ class TestExecutionService:
             scenarios=all_results,
         )
 
-        # Write combined report
-        report_html = generate_combined_report(summary, all_results)
+        # Write report
+        report_html = generate_detailed_report(summary, all_results)
         report_path = report_dir / "report.html"
         write_report(report_html, report_path)
         log(f"  Report: {report_path}")
-
-        # Write detailed trajectory report
-        detailed_html = generate_detailed_report(summary, all_results)
-        detailed_path = report_dir / "detailed_report.html"
-        write_report(detailed_html, detailed_path)
-        log(f"  Detailed Report: {detailed_path}")
 
         # Collect Nova Act workflow info
         wf_names = set()
