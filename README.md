@@ -2,6 +2,10 @@
 
 AI-powered QA test execution engine using Nova Act browser automation. Translates Gherkin feature files into executable tests using AI, then runs them with natural language browser automation.
 
+## Architecture
+
+![AI QA Test Engine Architecture](ai-qa-test-engine-arch.png)
+
 ## Quick Start
 
 ```bash
