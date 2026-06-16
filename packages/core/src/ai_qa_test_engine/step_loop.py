@@ -86,6 +86,7 @@ def execute_steps(
             # or from act_get fallback (stored on nova instance)
             trajectory_file = None
             was_replayed = False
+            sub_actions = None
             if hasattr(result, 'trajectory_file_path') and result.trajectory_file_path:
                 trajectory_file = result.trajectory_file_path
             elif hasattr(nova, '_last_trajectory_file') and nova._last_trajectory_file:
@@ -94,6 +95,11 @@ def execute_steps(
                 was_replayed = getattr(nova, '_last_was_replay', False)
                 nova._last_trajectory_file = None  # Reset after capture
                 nova._last_was_replay = False
+
+            # Pick up sub-actions from custom function calls
+            if hasattr(nova, '_last_sub_actions') and nova._last_sub_actions:
+                sub_actions = nova._last_sub_actions
+                nova._last_sub_actions = None
 
             step_results.append(StepResult(
                 step_number=step_idx,
@@ -104,6 +110,7 @@ def execute_steps(
                 extracted_value=result,
                 trajectory_file=trajectory_file,
                 replayed_from_cache=was_replayed,
+                sub_actions=sub_actions,
             ))
             cache_icon = "⚡" if was_replayed else ""
             log(f"  ✓{cache_icon} Step {step_idx} passed ({step_duration:.1f}s)", "info")

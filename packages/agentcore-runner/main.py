@@ -229,7 +229,7 @@ def _handle_execute(payload):
         result["result_s3_key"] = result_key
 
         # Generate and upload HTML report
-        html_report = f"<html><body><h1>{feature_name}</h1><pre>{json.dumps(result, indent=2, default=str)}</pre></body></html>"
+        html_report = f'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>{feature_name}</title></head><body><h1>{feature_name}</h1><pre>{json.dumps(result, indent=2, default=str)}</pre></body></html>'
         report_key = f"{output_prefix}/report.html"
         upload_string(html_report, output_bucket, report_key, content_type="text/html; charset=utf-8")
         result["report_s3_key"] = report_key
